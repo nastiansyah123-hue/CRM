@@ -351,7 +351,8 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
       <div class="form-group">
         <label class="form-label">Role</label>
         <select class="form-input" id="regRole" style="cursor:pointer">
-          <option value="cs">CS (Customer Service)</option>
+          <option value="cs">CRM</option>
+          <option value="admin_data">Admin Data</option>
           <option value="admin">SPV</option>
         </select>
       </div>
@@ -379,7 +380,7 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
   <div class="sidebar" id="sidebar">
     <div class="logo">
       <div class="logo-main">ADSY<span>CRM</span></div>
-      <div class="logo-sub" id="sidebarSub">CS Panel</div>
+      <div class="logo-sub" id="sidebarSub">CRM Panel</div>
     </div>
     <nav class="nav" id="sidebarNav">
       <!-- populated by JS based on role -->
@@ -544,7 +545,8 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
       <div class="fg">
         <div class="fl">Role</div>
         <select class="fs" id="csRole">
-          <option value="cs">CS (Customer Service)</option>
+          <option value="cs">CRM</option>
+          <option value="admin_data">Admin Data</option>
           <option value="admin">SPV</option>
         </select>
       </div>
@@ -569,7 +571,8 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
       <div class="fg"><div class="fl">Kode CS</div><input class="fi" id="editCsCode" style="text-transform:uppercase"></div>
       <div class="fg"><div class="fl">Role</div>
         <select class="fs" id="editCsRole">
-          <option value="cs">CS (Customer Service)</option>
+          <option value="cs">CRM</option>
+          <option value="admin_data">Admin Data</option>
           <option value="admin">SPV</option>
         </select>
       </div>
@@ -825,8 +828,8 @@ function initApp() {
   const initials = (p?.full_name||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
   updateAvatarUI(p?.avatar_url, initials);
   document.getElementById('userName').textContent = p?.full_name || currentUser.email;
-  document.getElementById('userRole').textContent = p?.role === 'admin' ? '👑 SPV' : p?.role === 'admin_data' ? '📊 Admin Data' : '👤 Customer Service';
-  document.getElementById('sidebarSub').textContent = p?.role === 'admin' ? 'SPV Panel' : p?.role === 'admin_data' ? 'Admin Data Panel' : 'CS Panel';
+  document.getElementById('userRole').textContent = p?.role === 'admin' ? '👑 SPV' : p?.role === 'admin_data' ? '📊 Admin Data' : '💬 CRM';
+  document.getElementById('sidebarSub').textContent = p?.role === 'admin' ? 'SPV Panel' : p?.role === 'admin_data' ? 'Admin Data Panel' : 'CRM Panel';
   buildSidebarNav();
   loadCustomers();
 }
@@ -2130,7 +2133,7 @@ function csUserRow(u) {
       <div style="font-weight:500;font-size:13px">${u.full_name}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:1px;display:flex;gap:8px;flex-wrap:wrap">
         ${u.cs_code ? `<span>🔖 ${u.cs_code}</span>` : ''}
-        <span>${u.role === 'admin' ? '👑 SPV' : u.role === 'admin_data' ? '📊 Admin Data' : '👤 CS'}</span>
+        <span>${u.role === 'admin' ? '👑 SPV' : u.role === 'admin_data' ? '📊 Admin Data' : '💬 CRM'}</span>
         <span>📅 Bergabung ${u.created_at ? new Date(u.created_at).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}) : '—'}</span>
       </div>
     </div>

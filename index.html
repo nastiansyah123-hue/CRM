@@ -1900,13 +1900,16 @@ async function doImport() {
 
   csProfiles.forEach(p => {
     const name = p.full_name || '';
-    // Simpan berbagai variasi key
-    csMap[name.toLowerCase()] = p.id;                                          // "crm alam"
-    csMap[name.toLowerCase().replace(/\s+/g,'')] = p.id;                       // "crmalam"
-    csMap[name.toLowerCase().replace(/^(cs|crm)\s*/i,'').trim()] = p.id;       // "alam"
+    const nameLow = name.toLowerCase();
+    const nameStripped = nameLow.replace(/^(cs|crm|spv)\s*/i,'').trim();
+    csMap[nameLow] = p.id;                                    // "crm alam"
+    csMap[nameLow.replace(/\s+/g,'')] = p.id;                // "crmalam"
+    csMap[nameStripped] = p.id;                               // "alam"
+    csMap['cs ' + nameStripped] = p.id;                       // "cs alam"
+    csMap['crm ' + nameStripped] = p.id;                      // "crm alam"
     if (p.cs_code) {
-      csMap[p.cs_code.toLowerCase()] = p.id;                                   // "crm_alam"
-      csMap[p.cs_code.toLowerCase().replace(/[_\s]/g,'')] = p.id;             // "crmalam"
+      csMap[p.cs_code.toLowerCase()] = p.id;
+      csMap[p.cs_code.toLowerCase().replace(/[_\s]/g,'')] = p.id;
     }
   });
 
@@ -1919,15 +1922,15 @@ async function doImport() {
     if (csMap[q]) return csMap[q];
     // 2. Tanpa spasi
     if (csMap[q.replace(/\s+/g,'')]) return csMap[q.replace(/\s+/g,'')];
-    // 3. Strip prefix CS/CRM
-    const stripped = q.replace(/^(cs|crm)\s*/i,'').trim();
+    // 3. Strip prefix CS/CRM/SPV dari input
+    const stripped = q.replace(/^(cs|crm|spv)\s*/i,'').trim();
     if (csMap[stripped]) return csMap[stripped];
-    // 4. Partial match — cari yang mengandung kata kunci
+    // 4. Cari di semua profil dengan strip prefix keduanya
     for (const p of csProfiles) {
-      const pName = (p.full_name||'').toLowerCase();
-      if (pName.includes(stripped) || stripped.includes(pName.replace(/^(cs|crm)\s*/i,'').trim())) {
-        return p.id;
-      }
+      const pStripped = (p.full_name||'').toLowerCase().replace(/^(cs|crm|spv)\s*/i,'').trim();
+      if (pStripped === stripped) return p.id;
+      // 5. Partial - nama profil mengandung kata dari Excel atau sebaliknya
+      if (pStripped.includes(stripped) || stripped.includes(pStripped)) return p.id;
     }
     return null;
   }

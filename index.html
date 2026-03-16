@@ -817,18 +817,38 @@ function buildSidebarNav() {
 // LOAD DATA
 // ════════════════════════════════════════════
 async function loadCustomers() {
-  document.getElementById('mainContent').innerHTML = '<div class="empty"><div class="spinner"></div><div class="loading-sub" style="margin-top:12px">Memuat data...</div></div>';
+  document.getElementById('mainContent').innerHTML = '<div class="empty"><div class="spinner"></div><div class="loading-sub" style="margin-top:12px" id="loadingText">Memuat data...</div></div>';
   const isAdmin = currentProfile?.role === 'admin';
-  let query = sb.from('customers').select('*').order('created_at', { ascending: false });
-  if (!isAdmin) query = query.eq('cs_id', currentUser.id);
-  const { data, error } = await query;
-  if (error) { toast('❌', 'Gagal memuat data: ' + error.message); return; }
-  customers = (data || []).map((d, i) => ({ ...d, _ci: i % COLORS.length }));
+
+  // Ambil SEMUA data dengan loop (Supabase limit 1000 per request)
+  let allData = [];
+  let from = 0;
+  const LIMIT = 1000;
+
+  while (true) {
+    const loadTxt = document.getElementById('loadingText');
+    if (loadTxt) loadTxt.textContent = `Memuat data... ${allData.length} baris`;
+
+    let query = sb.from('customers')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(from, from + LIMIT - 1);
+    if (!isAdmin) query = query.eq('cs_id', currentUser.id);
+
+    const { data, error } = await query;
+    if (error) { toast('❌', 'Gagal memuat data: ' + error.message); return; }
+    if (!data || data.length === 0) break;
+
+    allData = allData.concat(data);
+    if (data.length < LIMIT) break; // sudah semua
+    from += LIMIT;
+  }
+
+  customers = allData.map((d, i) => ({ ...d, _ci: i % COLORS.length }));
   filtered = [...customers];
   updateStats();
   renderView();
-  // Load CS stats for admin
-  if (isAdmin) loadCSStats();
+  if (currentProfile?.role === 'admin') loadCSStats();
 }
 
 async function loadCSStats() {

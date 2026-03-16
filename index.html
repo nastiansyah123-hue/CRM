@@ -825,8 +825,8 @@ function initApp() {
   const initials = (p?.full_name||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
   updateAvatarUI(p?.avatar_url, initials);
   document.getElementById('userName').textContent = p?.full_name || currentUser.email;
-  document.getElementById('userRole').textContent = p?.role === 'admin' ? '👑 SPV' : '👤 Customer Service';
-  document.getElementById('sidebarSub').textContent = p?.role === 'admin' ? 'SPV Panel' : 'CS Panel';
+  document.getElementById('userRole').textContent = p?.role === 'admin' ? '👑 SPV' : p?.role === 'admin_data' ? '📊 Admin Data' : '👤 Customer Service';
+  document.getElementById('sidebarSub').textContent = p?.role === 'admin' ? 'SPV Panel' : p?.role === 'admin_data' ? 'Admin Data Panel' : 'CS Panel';
   buildSidebarNav();
   loadCustomers();
 }
@@ -847,7 +847,7 @@ function updateAvatarUI(avatarUrl, initials) {
 }
 
 function buildSidebarNav() {
-  const isAdmin = currentProfile?.role === 'admin';
+  const isAdmin = ['admin','admin_data'].includes(currentProfile?.role);
   const nav = document.getElementById('sidebarNav');
   nav.innerHTML = `
     <div class="nav-sect">
@@ -887,12 +887,18 @@ function buildSidebarNav() {
         </div>
       </div>
     </div>
-    ${isAdmin ? `
+    ${currentProfile?.role === 'admin' ? `
     <div class="nav-sect">
       <div class="nav-label">SPV</div>
       <div class="nav-item" onclick="switchView('admin_cs',this)"><span class="ic">👥</span>Semua CS</div>
       <div class="nav-item" onclick="switchView('admin_import',this)"><span class="ic">📥</span>Import Data</div>
       <div class="nav-item" onclick="switchView('admin_users',this)"><span class="ic">⚙️</span>Kelola Akun</div>
+    </div>` : ''}
+    ${currentProfile?.role === 'admin_data' ? `
+    <div class="nav-sect">
+      <div class="nav-label">Admin Data</div>
+      <div class="nav-item" onclick="switchView('admin_import',this)"><span class="ic">📥</span>Upload Data</div>
+      <div class="nav-item" onclick="switchView('admin_cs',this)"><span class="ic">👥</span>Lihat Per CS</div>
     </div>` : ''}
   `;
 }
@@ -902,7 +908,7 @@ function buildSidebarNav() {
 // ════════════════════════════════════════════
 async function loadCustomers() {
   document.getElementById('mainContent').innerHTML = '<div class="empty"><div class="spinner"></div><div class="loading-sub" style="margin-top:12px" id="loadingText">Memuat data...</div></div>';
-  const isAdmin = currentProfile?.role === 'admin';
+  const isAdmin = ['admin','admin_data'].includes(currentProfile?.role);
 
   // Ambil SEMUA data dengan loop (Supabase limit 1000 per request)
   let allData = [];
@@ -938,7 +944,7 @@ async function loadCustomers() {
   filtered = [...customers];
   updateStats();
   renderView();
-  if (currentProfile?.role === 'admin') loadCSStats();
+  if (['admin','admin_data'].includes(currentProfile?.role)) loadCSStats();
 }
 
 async function loadCSStats() {
@@ -2047,6 +2053,7 @@ async function renderAdminUsers() {
   if (error) { toast('❌', 'Gagal memuat data'); return; }
 
   const csUsers = (users||[]).filter(u => u.role === 'cs');
+  const adminDataUsers = (users||[]).filter(u => u.role === 'admin_data');
   const adminUsers = (users||[]).filter(u => u.role === 'admin');
 
   document.getElementById('mainContent').innerHTML = `
@@ -2074,17 +2081,27 @@ async function renderAdminUsers() {
       <div class="table-head">
         <span class="table-ttl">👥 Daftar CS</span>
         <span class="result-count">${csUsers.length} CS</span>
-        <button class="btn btn-primary btn-sm" style="margin-left:8px" onclick="openCSModal()">＋ Tambah CS Baru</button>
+        <button class="btn btn-primary btn-sm" style="margin-left:8px" onclick="openCSModal()">＋ Tambah Akun</button>
       </div>
-      ${csUsers.length === 0 ? '<div class="empty"><div class="empty-ic">👤</div><div>Belum ada CS. Klik Tambah CS Baru.</div></div>' :
+      ${csUsers.length === 0 ? '<div class="empty"><div class="empty-ic">👤</div><div>Belum ada CS.</div></div>' :
         csUsers.map(u => csUserRow(u)).join('')}
     </div>
 
-    <!-- Admin List -->
+    <!-- Admin Data List -->
+    <div class="table-card" style="margin-top:16px">
+      <div class="table-head">
+        <span class="table-ttl">📊 Daftar Admin Data</span>
+        <span class="result-count">${adminDataUsers.length} akun</span>
+      </div>
+      ${adminDataUsers.length === 0 ? '<div class="empty" style="padding:20px"><div style="color:var(--text-muted);font-size:13px">Belum ada Admin Data. Klik Tambah Akun → pilih role Admin Data.</div></div>' :
+        adminDataUsers.map(u => csUserRow(u)).join('')}
+    </div>
+
+    <!-- Admin/SPV List -->
     <div class="table-card" style="margin-top:16px">
       <div class="table-head">
         <span class="table-ttl">👑 Daftar SPV</span>
-        <span class="result-count">${adminUsers.length} admin</span>
+        <span class="result-count">${adminUsers.length} SPV</span>
       </div>
       ${adminUsers.map(u => csUserRow(u)).join('')}
     </div>
@@ -2113,7 +2130,7 @@ function csUserRow(u) {
       <div style="font-weight:500;font-size:13px">${u.full_name}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:1px;display:flex;gap:8px;flex-wrap:wrap">
         ${u.cs_code ? `<span>🔖 ${u.cs_code}</span>` : ''}
-        <span>${u.role === 'admin' ? '👑 SPV' : '👤 CS'}</span>
+        <span>${u.role === 'admin' ? '👑 SPV' : u.role === 'admin_data' ? '📊 Admin Data' : '👤 CS'}</span>
         <span>📅 Bergabung ${u.created_at ? new Date(u.created_at).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}) : '—'}</span>
       </div>
     </div>

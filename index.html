@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CRM Numata — Database NMA</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{--bg:#070b12;--surface:#0f1520;--surface2:#141d2e;--surface3:#1a2540;--border:#1e2d47;--accent:#3b82f6;--accent2:#06b6d4;--accent3:#f59e0b;--accent4:#10b981;--danger:#ef4444;--text:#e2e8f0;--text-muted:#64748b;--text-dim:#94a3b8}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -202,6 +203,27 @@ tbody tr:hover .acts{opacity:1}
 .wa-link{color:var(--accent2);text-decoration:none;font-size:11px}
 .wa-link:hover{text-decoration:underline}
 .sep{width:1px;height:20px;background:var(--border);margin:0 2px}
+/* WA TEMPLATE MODAL */
+.wa-modal{max-width:620px}
+.wa-tabs{display:flex;gap:3px;margin-bottom:16px;background:var(--surface2);border-radius:9px;padding:4px}
+.wa-tab{flex:1;padding:7px 10px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;color:var(--text-muted);text-align:center;transition:all .15s;user-select:none}
+.wa-tab:hover{color:var(--text)}
+.wa-tab.active{background:var(--surface3);color:var(--text);border:1px solid var(--border)}
+.wa-template-card{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;cursor:pointer;transition:border-color .15s;position:relative}
+.wa-template-card:hover{border-color:var(--accent)}
+.wa-template-card.selected{border-color:var(--accent2);background:rgba(6,182,212,.05)}
+.wa-template-name{font-weight:600;font-size:13px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.wa-template-preview{font-size:12px;color:var(--text-dim);line-height:1.6;white-space:pre-wrap;max-height:100px;overflow:hidden;position:relative}
+.wa-template-preview::after{content:'';position:absolute;bottom:0;left:0;right:0;height:30px;background:linear-gradient(transparent,var(--surface2))}
+.wa-template-card.selected .wa-template-preview::after{background:linear-gradient(transparent,rgba(6,182,212,.05))}
+.wa-result{background:var(--surface2);border:1px solid var(--accent2);border-radius:10px;padding:14px;font-size:13px;color:var(--text);line-height:1.7;white-space:pre-wrap;word-break:break-word;max-height:280px;overflow-y:auto;margin-bottom:12px}
+.wa-result-actions{display:flex;gap:8px}
+.btn-wa{background:rgba(16,185,129,.15);color:var(--accent4);border:1px solid rgba(16,185,129,.3)}
+.btn-wa:hover{background:rgba(16,185,129,.25)}
+.fu-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:11px}
+.fu-toolbar-title{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;flex:1}
+.excel-btn{background:rgba(16,185,129,.15);color:#22c55e;border:1px solid rgba(16,185,129,.3)}
+.excel-btn:hover{background:rgba(16,185,129,.25)}
 </style>
 </head>
 <body>
@@ -330,7 +352,14 @@ tbody tr:hover .acts{opacity:1}
     </div>
 
     <!-- FU SCHEDULE VIEW -->
-    <div class="fu-view" id="fuView"></div>
+    <div class="fu-view" id="fuViewWrapper">
+      <div class="fu-toolbar">
+        <span class="fu-toolbar-title">📅 Jadwal Follow Up</span>
+        <button class="btn btn-sm excel-btn" onclick="exportFUExcel()">📊 Download Excel FU</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportFUCSV()">⬇️ CSV FU</button>
+      </div>
+      <div id="fuView"></div>
+    </div>
   </div>
 </div>
 
@@ -387,6 +416,37 @@ tbody tr:hover .acts{opacity:1}
     <div class="m-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeM()">Batal</button>
       <button class="btn btn-primary btn-sm" onclick="saveCustomer()">💾 Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- WA TEMPLATE MODAL -->
+<div class="modal-overlay" id="waModalOverlay" onclick="closeWAModal(event)">
+  <div class="modal wa-modal">
+    <div class="m-head">
+      <div class="m-ttl">📱 Template Pesan WA — <span id="waCustomerName" style="color:var(--accent2)"></span></div>
+      <div class="close-btn" onclick="document.getElementById('waModalOverlay').classList.remove('open')">✕</div>
+    </div>
+    <div class="m-body">
+      <div class="wa-tabs" id="waTabs">
+        <div class="wa-tab active" onclick="setWATab(0,this)">📦 Follow Up Paket</div>
+        <div class="wa-tab" onclick="setWATab(1,this)">🔄 Repeat Order</div>
+        <div class="wa-tab" onclick="setWATab(2,this)">⭐ Minta Testimoni</div>
+        <div class="wa-tab" onclick="setWATab(3,this)">💊 Edukasi</div>
+        <div class="wa-tab" onclick="setWATab(4,this)">🎁 Promo</div>
+      </div>
+
+      <!-- Template list -->
+      <div id="waTemplateList" style="margin-bottom:14px;max-height:200px;overflow-y:auto"></div>
+
+      <!-- Preview result -->
+      <div style="margin-bottom:8px;font-size:11px;font-weight:600;color:var(--text-muted);letter-spacing:.5px;text-transform:uppercase">Preview Pesan:</div>
+      <div class="wa-result" id="waResult">Pilih template di atas...</div>
+      <div class="wa-result-actions">
+        <button class="btn btn-sm btn-wa" style="flex:1" onclick="copyWAMsg()">📋 Copy Pesan</button>
+        <button class="btn btn-sm btn-primary" style="flex:1" id="waSendBtn">📱 Buka WhatsApp</button>
+        <button class="btn btn-sm btn-ghost" onclick="editWAMsg()">✏️ Edit</button>
+      </div>
     </div>
   </div>
 </div>
@@ -547,7 +607,7 @@ function setTab(tab, el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   if(el) el.classList.add('active');
   document.getElementById('tableView').style.display = tab==='table' ? '' : 'none';
-  document.getElementById('fuView').style.display = tab==='fu' ? 'block' : 'none';
+  document.getElementById('fuViewWrapper').style.display = tab==='fu' ? 'block' : 'none';
   if(tab==='fu') renderFUView();
 }
 
@@ -762,7 +822,10 @@ function fuItemHTML(d){
       <div class="fu-item-date" style="color:${deltaColor}">${deltaStr}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${dateStr}</div>
     </div>
-    ${d.hp?`<a class="fu-wa" href="https://wa.me/${d.hp}" target="_blank" onclick="event.stopPropagation()">📱 WA</a>`:''}
+    <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0" onclick="event.stopPropagation()">
+      ${d.hp?`<a class="fu-wa" href="https://wa.me/${d.hp}" target="_blank">📱 WA</a>`:''}
+      <button class="btn btn-sm" style="background:rgba(245,158,11,.12);color:var(--accent3);border:1px solid rgba(245,158,11,.25);font-size:10px;padding:4px 8px" onclick="openWATemplate(${d.id})">💬 Template</button>
+    </div>
   </div>`;
 }
 
@@ -940,6 +1003,392 @@ function exportCSV(){
   a.download='NMA_CRM_'+TODAY_STR+'.csv';
   a.click();
   toast('⬇️','Export berhasil!');
+}
+
+// ===== EXPORT FU CSV =====
+function exportFUCSV(){
+  const fuData = getFUData();
+  const headers=['No','Nama','No HP','Kabupaten','CS','Status Paket','Jadwal FU','Status FU','Hari Tersisa/Terlambat','Last FU','Keluhan','Catatan'];
+  const rows = fuData.map((d,i)=>{
+    const delta=fuDelta(d.jadwal_fu);
+    const deltaText = d.jadwal_fu==='recall'?'Perlu Recall': delta===null?'':delta<0?`Terlambat ${Math.abs(delta)} hari`:delta===0?'Hari Ini':`${delta} hari lagi`;
+    return [i+1,d.nama,d.hp,d.kabupaten,d.nama_cs,d.status_paket,d.jadwal_fu,fuStatus(d),deltaText,d.last_fu,d.penyakit,d.catatan];
+  });
+  const csv=[headers,...rows].map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+  a.download='Jadwal_FU_NMA_'+TODAY_STR+'.csv';
+  a.click();
+  toast('⬇️','CSV FU berhasil didownload!');
+}
+
+// ===== EXPORT FU EXCEL =====
+function getFUData(){
+  const all = filtered.filter(d=>d.jadwal_fu&&d.jadwal_fu!=='');
+  const ord = {today:0,overdue:1,soon:2,upcoming:3,recall:4,none:5};
+  return all.sort((a,b)=>{
+    const sa=fuStatus(a)==='recall'?'recall':fuStatus(a);
+    const sb=fuStatus(b)==='recall'?'recall':fuStatus(b);
+    if(ord[sa]!==ord[sb]) return (ord[sa]||9)-(ord[sb]||9);
+    const da=fuDelta(a.jadwal_fu)||9999, db=fuDelta(b.jadwal_fu)||9999;
+    return da-db;
+  });
+}
+
+function exportFUExcel(){
+  if(typeof XLSX==='undefined'){ toast('⚠️','Library Excel belum siap, coba lagi'); return; }
+  const fuData = getFUData();
+  if(!fuData.length){ toast('⚠️','Tidak ada data jadwal FU'); return; }
+  toast('⏳','Menyiapkan file Excel...');
+
+  const wb = XLSX.utils.book_new();
+
+  // ---- Sheet 1: Semua Jadwal FU ----
+  const headers=['No','Nama Customer','No HP','Kabupaten','Kecamatan','Provinsi','Nama CS','Status Paket','Jadwal Follow Up','Status FU','Hari (Tersisa/Terlambat)','Last FU','Keluhan/Penyakit','CRM','Testimoni','Manjur','Zonk','Catatan'];
+  const rows = fuData.map((d,i)=>{
+    const delta=fuDelta(d.jadwal_fu);
+    const statusLabel = d.jadwal_fu==='recall'?'Perlu Recall':
+      fuStatus(d)==='overdue'?'TERLAMBAT':fuStatus(d)==='today'?'HARI INI':fuStatus(d)==='soon'?'Segera (≤7hr)':'Mendatang';
+    const deltaText = d.jadwal_fu==='recall'?'Perlu Recall':delta===null?'':delta<0?`Terlambat ${Math.abs(delta)} hari`:delta===0?'Hari Ini':`${delta} hari lagi`;
+    return [i+1,d.nama,d.hp,d.kabupaten,d.kecamatan,d.provinsi,d.nama_cs,d.status_paket,
+      d.jadwal_fu&&d.jadwal_fu!=='recall'?new Date(d.jadwal_fu).toLocaleDateString('id-ID'):d.jadwal_fu,
+      statusLabel,deltaText,d.last_fu||'',d.penyakit||'',d.crm?'Ya':'Tidak',d.testimoni?'Ya':'Tidak',d.manjur?'Ya':'Tidak',d.zonk?'Ya':'Tidak',d.catatan||''];
+  });
+
+  const ws1Data=[headers,...rows];
+  const ws1=XLSX.utils.aoa_to_sheet(ws1Data);
+
+  // Column widths
+  ws1['!cols']=[{wch:4},{wch:22},{wch:16},{wch:18},{wch:16},{wch:16},{wch:14},{wch:12},{wch:18},{wch:14},{wch:20},{wch:14},{wch:35},{wch:6},{wch:10},{wch:8},{wch:6},{wch:30}];
+
+  // Style header row
+  const range=XLSX.utils.decode_range(ws1['!ref']);
+  for(let c=range.s.c;c<=range.e.c;c++){
+    const cell=XLSX.utils.encode_cell({r:0,c});
+    if(ws1[cell]){
+      ws1[cell].s={
+        font:{bold:true,color:{rgb:'FFFFFF'},sz:11},
+        fill:{fgColor:{rgb:'1E3A5F'}},
+        alignment:{horizontal:'center',vertical:'center',wrapText:true},
+        border:{bottom:{style:'medium',color:{rgb:'4F7CFF'}}}
+      };
+    }
+  }
+
+  // Color rows by status
+  const statusColors={
+    'TERLAMBAT':'FFEAEA','HARI INI':'FFF9E6','Segera (≤7hr)':'EAFAF1','Mendatang':'EAF2FF','Perlu Recall':'F5EAFF'
+  };
+  for(let r=1;r<ws1Data.length;r++){
+    const statusVal=ws1Data[r][9];
+    const bgHex=statusColors[statusVal]||'FFFFFF';
+    for(let c=range.s.c;c<=range.e.c;c++){
+      const cell=XLSX.utils.encode_cell({r,c});
+      if(!ws1[cell]) ws1[cell]={t:'s',v:''};
+      ws1[cell].s={
+        fill:{fgColor:{rgb:bgHex}},
+        alignment:{vertical:'center',wrapText:c===12||c===17},
+        border:{bottom:{style:'thin',color:{rgb:'DDDDDD'}},right:{style:'thin',color:{rgb:'DDDDDD'}}}
+      };
+    }
+  }
+  ws1['!freeze']={xSplit:0,ySplit:1};
+  XLSX.utils.book_append_sheet(wb,'Semua Jadwal FU',ws1);
+
+  // ---- Sheet 2: FU Terlambat ----
+  const overdueData=fuData.filter(d=>fuStatus(d)==='overdue');
+  if(overdueData.length){
+    const ws2rows=overdueData.map((d,i)=>{
+      const delta=fuDelta(d.jadwal_fu);
+      return [i+1,d.nama,d.hp,d.kabupaten,d.nama_cs,
+        d.jadwal_fu?new Date(d.jadwal_fu).toLocaleDateString('id-ID'):'',
+        delta!==null?`${Math.abs(delta)} hari`:'',d.last_fu||'',d.penyakit||'',d.catatan||''];
+    });
+    const ws2=XLSX.utils.aoa_to_sheet([['No','Nama','No HP','Kota','CS','Jadwal FU','Terlambat','Last FU','Keluhan','Catatan'],...ws2rows]);
+    ws2['!cols']=[{wch:4},{wch:22},{wch:16},{wch:18},{wch:14},{wch:14},{wch:12},{wch:12},{wch:35},{wch:30}];
+    XLSX.utils.book_append_sheet(wb,'FU Terlambat 🔴',ws2);
+  }
+
+  // ---- Sheet 3: FU 7 Hari ----
+  const weekData=fuData.filter(d=>fuStatus(d)==='today'||fuStatus(d)==='soon');
+  if(weekData.length){
+    const ws3rows=weekData.map((d,i)=>{
+      const delta=fuDelta(d.jadwal_fu);
+      return [i+1,d.nama,d.hp,d.kabupaten,d.nama_cs,
+        d.jadwal_fu?new Date(d.jadwal_fu).toLocaleDateString('id-ID'):'',
+        delta===0?'Hari Ini':`${delta} hari lagi`,d.last_fu||'',d.penyakit||'',d.catatan||''];
+    });
+    const ws3=XLSX.utils.aoa_to_sheet([['No','Nama','No HP','Kota','CS','Jadwal FU','Sisa Hari','Last FU','Keluhan','Catatan'],...ws3rows]);
+    ws3['!cols']=[{wch:4},{wch:22},{wch:16},{wch:18},{wch:14},{wch:14},{wch:12},{wch:12},{wch:35},{wch:30}];
+    XLSX.utils.book_append_sheet(wb,'FU 7 Hari 🟢',ws3);
+  }
+
+  // ---- Sheet 4: Ringkasan per CS ----
+  const csList=[...new Set(fuData.map(d=>d.nama_cs).filter(Boolean))].sort();
+  const summaryRows=csList.map(cs=>{
+    const csData=fuData.filter(d=>d.nama_cs===cs);
+    return [cs, csData.length, csData.filter(d=>fuStatus(d)==='overdue').length,
+      csData.filter(d=>fuStatus(d)==='today').length,
+      csData.filter(d=>fuStatus(d)==='soon').length,
+      csData.filter(d=>fuStatus(d)==='upcoming').length];
+  });
+  const ws4=XLSX.utils.aoa_to_sheet([['Nama CS','Total FU','Terlambat 🔴','Hari Ini 🟡','7 Hari 🟢','Mendatang 📅'],...summaryRows]);
+  ws4['!cols']=[{wch:18},{wch:10},{wch:14},{wch:12},{wch:10},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,'Ringkasan CS',ws4);
+
+  // Download
+  XLSX.writeFile(wb,'Jadwal_FU_NMA_'+TODAY_STR+'.xlsx');
+  setTimeout(()=>toast('📊','Excel Jadwal FU berhasil didownload!'),300);
+}
+
+// ===== WA TEMPLATE =====
+const WA_TEMPLATES = [
+  {
+    cat:0, name:'📦 FU Paket Dikirim', icon:'📦',
+    tpl:(d)=>`Assalamu'alaikum, selamat siang Bapak/Ibu *${d.nama}* 🙏
+
+Kami dari Tim Numata ingin memastikan paket Numata sudah sampai dengan baik ya Pak/Bu 😊
+
+Apakah sudah diterima dan sudah mulai dikonsumsi?
+
+Semoga bermanfaat untuk kesehatan mata Bapak/Ibu 👁️✨
+
+Jika ada pertanyaan, kami siap membantu 🙏
+_CS ${d.nama_cs||'Numata'}_`
+  },
+  {
+    cat:0, name:'📦 FU Konfirmasi Penerimaan', icon:'✅',
+    tpl:(d)=>`Assalamu'alaikum Bapak/Ibu *${d.nama}* 🙏
+
+Maaf mengganggu waktunya ya Pak/Bu 😊
+
+Kami ingin konfirmasi, apakah paket Numata sudah sampai ke tangan Bapak/Ibu?
+
+Mohon kabarkan kami jika sudah diterima, agar kami bisa memberikan panduan konsumsi yang tepat 🙏
+
+Terima kasih 🌟
+_Tim CS Numata_`
+  },
+  {
+    cat:1, name:'🔄 Repeat Order — Hampir Habis', icon:'🔄',
+    tpl:(d)=>`Assalamu'alaikum Bapak/Ibu *${d.nama}* 👋
+
+Semoga sehat selalu ya Pak/Bu 🙏
+
+Kami dari Tim Numata ingin mengingatkan, apakah stok Numata Bapak/Ibu sudah hampir habis?
+
+Agar tidak ada jeda dalam konsumsi, lebih baik order sekarang agar manfaatnya tetap terjaga 👁️
+
+${d.penyakit?`Untuk kondisi *${d.penyakit.substring(0,60)}*, konsistensi konsumsi sangat penting ya Pak/Bu 💊\n\n`:''}Mau kami bantu proses order selanjutnya? 😊
+
+_CS ${d.nama_cs||'Numata'}_`
+  },
+  {
+    cat:1, name:'🔄 Repeat Order — Ajakan Lanjut', icon:'💊',
+    tpl:(d)=>`Halo Bapak/Ibu *${d.nama}* 😊
+
+Sudah berapa lama konsumsi Numata-nya Pak/Bu? Semoga sudah mulai ada perubahan ya 👁️✨
+
+Untuk hasil yang maksimal, disarankan konsumsi minimal 3 bulan secara rutin.
+
+Apakah Bapak/Ibu mau melanjutkan program konsumsinya?
+
+Kami siap bantu proses order berikutnya dengan mudah 🙏
+
+_Tim CS Numata_`
+  },
+  {
+    cat:2, name:'⭐ Minta Testimoni', icon:'⭐',
+    tpl:(d)=>`Assalamu'alaikum Bapak/Ibu *${d.nama}* 🙏
+
+Semoga sehat selalu ya Pak/Bu ✨
+
+Kami ingin mengetahui perkembangan mata Bapak/Ibu setelah mengonsumsi Numata 👁️
+
+Boleh kami minta cerita pengalamannya Pak/Bu? Seperti:
+• Apakah ada perubahan yang dirasakan?
+• Sudah berapa botol yang dikonsumsi?
+• Keluhan awal seperti apa?
+
+Testimoni Bapak/Ibu sangat berharga untuk membantu orang lain yang memiliki masalah serupa 🙏
+
+Terima kasih banyak 🌟
+_CS ${d.nama_cs||'Numata'}_`
+  },
+  {
+    cat:2, name:'⭐ Minta Review Singkat', icon:'📝',
+    tpl:(d)=>`Halo Bapak/Ibu *${d.nama}* 😊
+
+Boleh kami minta 1-2 menit waktunya Pak/Bu?
+
+Kami ingin tau, bagaimana kondisi mata Bapak/Ibu setelah konsumsi Numata?
+
+Cukup jawab:
+1. Apakah ada perubahan positif? ✅/❌
+2. Apa yang paling dirasakan perubahannya?
+
+Jawaban singkat pun sangat membantu kami 🙏
+Terima kasih Pak/Bu!
+
+_Tim CS Numata_`
+  },
+  {
+    cat:3, name:'💊 Edukasi Cara Konsumsi', icon:'📋',
+    tpl:(d)=>`Assalamu'alaikum Bapak/Ibu *${d.nama}* 🙏
+
+Semoga sehat selalu ya 😊
+
+Kami ingin berbagi tips konsumsi Numata agar hasilnya maksimal 👁️✨
+
+*Tips Konsumsi Numata:*
+✅ Minum 2 kapsul/hari (pagi & malam)
+✅ Diminum setelah makan
+✅ Minum dengan air putih yang cukup
+✅ Konsumsi rutin minimal 3 bulan
+✅ Kurangi paparan layar berlebihan
+
+Konsistensi adalah kunci Pak/Bu 💪
+
+Ada pertanyaan seputar cara konsumsi? Kami siap membantu 🙏
+
+_CS ${d.nama_cs||'Numata'}_`
+  },
+  {
+    cat:3, name:'💊 Edukasi Kesehatan Mata', icon:'👁️',
+    tpl:(d)=>`Halo Bapak/Ibu *${d.nama}* 😊
+
+Tahukah Bapak/Ibu? Kesehatan mata sangat dipengaruhi oleh nutrisi yang masuk ke tubuh kita 👁️
+
+*Kandungan Numata yang bermanfaat:*
+🌿 Menjaga ketajaman penglihatan
+🌿 Membantu regenerasi sel mata
+🌿 Melindungi dari radikal bebas
+🌿 Mengurangi kelelahan mata
+
+${d.penyakit?`Untuk keluhan *${d.penyakit.substring(0,50)}* yang Bapak/Ibu alami, Numata sangat tepat dikonsumsi secara rutin ya 🙏\n\n`:''}Tetap semangat dan konsisten ya Pak/Bu! 💪
+
+_Tim CS Numata_`
+  },
+  {
+    cat:4, name:'🎁 Info Promo', icon:'🔥',
+    tpl:(d)=>`Assalamu'alaikum Bapak/Ibu *${d.nama}* 🙏
+
+Ada kabar gembira untuk Bapak/Ibu 🎉
+
+*PROMO SPESIAL NUMATA* 🔥
+
+✨ Beli 3 Gratis 1
+✨ Diskon khusus pelanggan setia
+✨ Gratis ongkir ke seluruh Indonesia
+
+Penawaran ini terbatas ya Pak/Bu, jangan sampai kehabisan!
+
+Mau kami bantu proses order dengan harga promo? 😊
+
+_CS ${d.nama_cs||'Numata'}_`
+  },
+  {
+    cat:4, name:'🎁 Promo Bundling', icon:'📦',
+    tpl:(d)=>`Halo Bapak/Ibu *${d.nama}* 😊
+
+Spesial untuk pelanggan setia Numata seperti Bapak/Ibu, ada penawaran istimewa nih 🎁
+
+*PAKET HEMAT 3 BULAN:*
+📦 3 Botol Numata + FREE 1 Botol
+💰 Lebih hemat 25% dari harga normal
+🚚 Gratis ongkir
+
+Untuk hasil yang optimal, 3 bulan konsumsi rutin sangat dianjurkan 👁️
+
+Tertarik Pak/Bu? Kami bisa bantu prosesin sekarang 😊
+
+_CS ${d.nama_cs||'Numata'}_`
+  }
+];
+
+let currentWACustomer = null;
+let selectedWATemplateIdx = null;
+let activeWACat = 0;
+
+function openWATemplate(id){
+  const d = data.find(x=>x.id===id);
+  if(!d) return;
+  currentWACustomer = d;
+  selectedWATemplateIdx = null;
+  document.getElementById('waCustomerName').textContent = d.nama;
+  document.getElementById('waResult').textContent = 'Pilih template di atas...';
+  document.getElementById('waSendBtn').onclick = ()=>{};
+  renderWATemplates(0);
+  // Set first tab active
+  document.querySelectorAll('.wa-tab').forEach((t,i)=>t.classList.toggle('active',i===0));
+  activeWACat=0;
+  document.getElementById('waModalOverlay').classList.add('open');
+}
+
+function renderWATemplates(cat){
+  const list = document.getElementById('waTemplateList');
+  const templates = WA_TEMPLATES.filter(t=>t.cat===cat);
+  list.innerHTML = templates.map((t,i)=>{
+    const fullIdx = WA_TEMPLATES.indexOf(t);
+    const preview = currentWACustomer ? t.tpl(currentWACustomer) : '';
+    return `<div class="wa-template-card ${selectedWATemplateIdx===fullIdx?'selected':''}" onclick="selectWATemplate(${fullIdx})">
+      <div class="wa-template-name">${t.name}</div>
+      <div class="wa-template-preview">${preview.replace(/\*/g,'').replace(/_/g,'')}</div>
+    </div>`;
+  }).join('');
+}
+
+function selectWATemplate(idx){
+  selectedWATemplateIdx = idx;
+  const t = WA_TEMPLATES[idx];
+  const msg = t.tpl(currentWACustomer);
+  document.getElementById('waResult').textContent = msg;
+  // Update selected state
+  renderWATemplates(activeWACat);
+  // Set send button
+  if(currentWACustomer && currentWACustomer.hp){
+    const encoded = encodeURIComponent(msg);
+    document.getElementById('waSendBtn').onclick = ()=>window.open(`https://wa.me/${currentWACustomer.hp}?text=${encoded}`,'_blank');
+    document.getElementById('waSendBtn').style.opacity='1';
+    document.getElementById('waSendBtn').style.pointerEvents='';
+  } else {
+    document.getElementById('waSendBtn').style.opacity='0.4';
+    document.getElementById('waSendBtn').style.pointerEvents='none';
+  }
+}
+
+function setWATab(cat, el){
+  activeWACat = cat;
+  document.querySelectorAll('.wa-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  selectedWATemplateIdx = null;
+  document.getElementById('waResult').textContent = 'Pilih template di atas...';
+  renderWATemplates(cat);
+}
+
+function copyWAMsg(){
+  const msg = document.getElementById('waResult').textContent;
+  if(!msg || msg==='Pilih template di atas...'){ toast('⚠️','Pilih template dulu!'); return; }
+  navigator.clipboard.writeText(msg).then(()=>toast('📋','Pesan berhasil di-copy!')).catch(()=>{
+    // fallback
+    const ta=document.createElement('textarea');
+    ta.value=msg; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('📋','Pesan berhasil di-copy!');
+  });
+}
+
+function editWAMsg(){
+  const el = document.getElementById('waResult');
+  el.contentEditable = el.contentEditable==='true' ? 'false' : 'true';
+  el.style.outline = el.contentEditable==='true' ? '2px solid var(--accent)' : 'none';
+  if(el.contentEditable==='true'){ el.focus(); toast('✏️','Mode edit aktif — teks bisa diubah'); }
+  else toast('✅','Edit selesai');
+}
+
+function closeWAModal(e){
+  if(e.target===document.getElementById('waModalOverlay'))
+    document.getElementById('waModalOverlay').classList.remove('open');
 }
 
 function toast(ic,msg){

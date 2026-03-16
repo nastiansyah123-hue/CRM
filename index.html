@@ -879,10 +879,20 @@ function buildSidebarNav() {
     <div class="nav-sect">
       <div class="nav-label">Menu</div>
       <div class="nav-item active" onclick="switchView('db',this)"><span class="ic">📋</span>Database Customer<span class="nav-badge nb-blue" id="navAll">0</span></div>
-      <div class="nav-item" onclick="switchView('fu_overdue',this)"><span class="ic">🔴</span>FU Terlambat<span class="nav-badge nb-red" id="navOverdue">0</span></div>
-      <div class="nav-item" onclick="switchView('fu_today',this)"><span class="ic">🟡</span>FU Hari Ini<span class="nav-badge nb-orange" id="navToday">0</span></div>
-      <div class="nav-item" onclick="switchView('fu_week',this)"><span class="ic">🟢</span>FU 7 Hari<span class="nav-badge nb-green" id="navWeek">0</span></div>
+      <div class="nav-item" onclick="toggleFuDd()" style="justify-content:space-between">
+        <span><span class="ic">📞</span>Follow Up</span>
+        <span id="fuDdArrow" style="font-size:10px;color:var(--text-muted);transition:transform .2s">▼</span>
+      </div>
+      <div id="fuDdList" style="display:none;margin:2px 8px 4px;border-radius:8px;overflow:hidden;border:1px solid var(--border)">
+        <div class="nav-item" onclick="switchView('fu_overdue',this)" style="border-radius:0;padding:7px 14px;font-size:12px">🔴 FU Terlambat<span class="nav-badge nb-red" id="navOverdue">0</span></div>
+        <div class="nav-item" onclick="switchView('fu_today',this)" style="border-radius:0;padding:7px 14px;font-size:12px">🟡 FU Hari Ini<span class="nav-badge nb-orange" id="navToday">0</span></div>
+        <div class="nav-item" onclick="switchView('fu_week',this)" style="border-radius:0;padding:7px 14px;font-size:12px">🟢 FU 7 Hari<span class="nav-badge nb-green" id="navWeek">0</span></div>
+        <div class="nav-item" onclick="switchView('fu_resi',this)" style="border-radius:0;padding:7px 14px;font-size:12px">📦 FU Resi</div>
+        <div class="nav-item" onclick="switchView('fu_edukasi',this)" style="border-radius:0;padding:7px 14px;font-size:12px">📚 FU Edukasi</div>
+        <div class="nav-item" onclick="switchView('fu_promo',this)" style="border-radius:0;padding:7px 14px;font-size:12px">🎁 FU Promo</div>
+      </div>
       ${isCS ? `<div class="nav-item" onclick="switchView('cs_import',this)"><span class="ic">📥</span>Import Data</div>` : ''}
+      <div class="nav-item" onclick="switchView('cs_progres',this)"><span class="ic">🚚</span>Progres Orderan</div>
     </div>
     <div class="nav-sect">
       <div class="nav-label">Filter Label</div>
@@ -1059,11 +1069,15 @@ function switchView(view, navEl) {
     if (currentProfile?.role === 'admin_data') { renderAdminImport(); return; }
     renderCSImport(); return;
   }
+  if (view === 'cs_progres') { renderUpdateProgres(); return; }
   // Data filter views
   filtered = customers.filter(d => {
     if (view === 'fu_overdue') return fuStatus(d) === 'overdue';
     if (view === 'fu_today') return fuStatus(d) === 'today';
     if (view === 'fu_week') return ['today','soon'].includes(fuStatus(d));
+    if (view === 'fu_resi') return d.resi && d.status_paket !== 'DELIVERED';
+    if (view === 'fu_edukasi') return d.crm && d.status_paket === 'DELIVERED';
+    if (view === 'fu_promo') return d.promo;
     if (view === 'crm') return d.crm;
     if (view === 'delivered') return d.status_paket === 'DELIVERED';
     if (view === 'testimoni') return d.info_testimoni;
@@ -1082,7 +1096,8 @@ function switchView(view, navEl) {
 function renderView() {
   const titles = {
     db:'Database Customer', fu_overdue:'🔴 FU Terlambat', fu_today:'🟡 FU Hari Ini',
-    fu_week:'🟢 FU 7 Hari', crm:'💬 CRM Aktif', delivered:'✅ Delivered', testimoni:'⭐ Testimoni', loyal:'🌟 Customer Loyal',
+    fu_week:'🟢 FU 7 Hari', fu_resi:'📦 FU Resi', fu_edukasi:'📚 FU Edukasi', fu_promo:'🎁 FU Promo',
+    crm:'💬 CRM Aktif', delivered:'✅ Delivered', testimoni:'⭐ Testimoni', loyal:'🌟 Customer Loyal',
     ro1:'🛒 RO 1', ro2:'🛒 RO 2', ro3:'🛒 RO 3', ro4:'🛒 RO 4', ro5:'🛒 RO 5',
     ro6:'🛒 RO 6', ro7:'🛒 RO 7', ro8:'🛒 RO 8', ro9:'🛒 RO 9', ro10:'🛒 RO 10'
   };
@@ -2605,6 +2620,16 @@ function exportSelectedExcel() {
 function toggleMobSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('overlay').classList.toggle('show');
+}
+
+// ── FU DROPDOWN ──────────────────────────────
+function toggleFuDd() {
+  const list = document.getElementById('fuDdList');
+  const arrow = document.getElementById('fuDdArrow');
+  if (!list) return;
+  const isOpen = list.style.display !== 'none';
+  list.style.display = isOpen ? 'none' : 'block';
+  if (arrow) arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
 }
 
 // ── RO DROPDOWN ──────────────────────────────

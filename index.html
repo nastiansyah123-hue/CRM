@@ -831,7 +831,12 @@ function initApp() {
   document.getElementById('userRole').textContent = p?.role === 'admin' ? '👑 SPV' : p?.role === 'admin_data' ? '📊 Admin Data' : '💬 CRM';
   document.getElementById('sidebarSub').textContent = p?.role === 'admin' ? 'SPV Panel' : p?.role === 'admin_data' ? 'Admin Data Panel' : 'CRM Panel';
   buildSidebarNav();
-  loadCustomers();
+  // Admin Data langsung ke Upload Data, tidak perlu load semua customer
+  if (p?.role === 'admin_data') {
+    renderUpdateProgres();
+  } else {
+    loadCustomers();
+  }
 }
 
 function updateAvatarUI(avatarUrl, initials) {

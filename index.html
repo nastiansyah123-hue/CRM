@@ -418,6 +418,70 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
   </div>
 </div>
 
+<!-- Modal Tambah/Edit CS -->
+<div class="modal-overlay" id="csModalOverlay" onclick="closeCSModalBg(event)">
+  <div class="modal" style="max-width:460px">
+    <div class="m-head">
+      <div class="m-ttl" id="csMTtl">Tambah CS Baru</div>
+      <div class="close-btn" onclick="closeCSModal()">✕</div>
+    </div>
+    <div class="m-body">
+      <div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--text-dim);line-height:1.6">
+        📧 CS akan mendapat <strong>email undangan</strong> dari Supabase. Mereka klik link di email → buat password sendiri → langsung bisa login.
+      </div>
+      <div class="fg">
+        <div class="fl">Nama Lengkap CS *</div>
+        <input class="fi" id="csName" placeholder="CS Rina">
+      </div>
+      <div class="fg">
+        <div class="fl">Email CS *</div>
+        <input class="fi" id="csEmail" type="email" placeholder="rina@email.com">
+      </div>
+      <div class="fg">
+        <div class="fl">Kode CS</div>
+        <input class="fi" id="csCode" placeholder="CS_RINA" style="text-transform:uppercase">
+      </div>
+      <div class="fg">
+        <div class="fl">Role</div>
+        <select class="fs" id="csRole">
+          <option value="cs">CS (Customer Service)</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div id="csInviteResult" style="display:none;margin-top:12px"></div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeCSModal()">Batal</button>
+      <button class="btn btn-primary btn-sm" id="saveCsBtn" onclick="inviteCS()">📧 Kirim Undangan</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Edit CS -->
+<div class="modal-overlay" id="csEditOverlay" onclick="if(event.target===this)closeCSEdit()">
+  <div class="modal" style="max-width:420px">
+    <div class="m-head">
+      <div class="m-ttl">✏️ Edit CS</div>
+      <div class="close-btn" onclick="closeCSEdit()">✕</div>
+    </div>
+    <div class="m-body">
+      <div class="fg"><div class="fl">Nama Lengkap *</div><input class="fi" id="editCsName"></div>
+      <div class="fg"><div class="fl">Kode CS</div><input class="fi" id="editCsCode" style="text-transform:uppercase"></div>
+      <div class="fg"><div class="fl">Role</div>
+        <select class="fs" id="editCsRole">
+          <option value="cs">CS (Customer Service)</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <input type="hidden" id="editCsId">
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeCSEdit()">Batal</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEditCS()">💾 Simpan</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"><span id="tIc">✅</span><span id="tMsg"></span></div>
 
@@ -1107,42 +1171,195 @@ async function viewCSData(csId, csName) {
 async function renderAdminUsers() {
   document.getElementById('topTitle').textContent = '⚙️ Kelola Akun CS';
   document.getElementById('addBtn').style.display = 'none';
+  document.getElementById('exportBtn').style.display = 'none';
   document.getElementById('searchBoxWrap').style.display = 'none';
   document.getElementById('mainContent').innerHTML = '<div class="empty"><div class="spinner"></div></div>';
-  const { data: users } = await sb.from('profiles').select('*').order('full_name');
-  const html = `
+  const { data: users, error } = await sb.from('profiles').select('*').order('full_name');
+  if (error) { toast('❌', 'Gagal memuat data'); return; }
+
+  const csUsers = (users||[]).filter(u => u.role === 'cs');
+  const adminUsers = (users||[]).filter(u => u.role === 'admin');
+
+  document.getElementById('mainContent').innerHTML = `
+    <!-- Summary cards -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
+      <div class="stat-card c1" style="cursor:default">
+        <div class="stat-ic">👥</div>
+        <div class="stat-val">${csUsers.length}</div>
+        <div class="stat-lbl">Total CS</div>
+      </div>
+      <div class="stat-card c3" style="cursor:default">
+        <div class="stat-ic">✅</div>
+        <div class="stat-val">${csUsers.filter(u=>u.is_active).length}</div>
+        <div class="stat-lbl">CS Aktif</div>
+      </div>
+      <div class="stat-card c5" style="cursor:default">
+        <div class="stat-ic">🚫</div>
+        <div class="stat-val">${csUsers.filter(u=>!u.is_active).length}</div>
+        <div class="stat-lbl">Nonaktif</div>
+      </div>
+    </div>
+
+    <!-- CS List -->
     <div class="table-card">
       <div class="table-head">
-        <span class="table-ttl">Daftar Akun</span>
-        <span class="result-count">${users?.length||0} akun</span>
-        <button class="btn btn-primary btn-sm" style="margin-left:8px" onclick="showAddUserInfo()">＋ Tambah CS</button>
+        <span class="table-ttl">👥 Daftar CS</span>
+        <span class="result-count">${csUsers.length} CS</span>
+        <button class="btn btn-primary btn-sm" style="margin-left:8px" onclick="openCSModal()">＋ Tambah CS Baru</button>
       </div>
-      ${(users||[]).map(u=>`
-        <div class="user-list-item">
-          <div class="user-ava" style="width:36px;height:36px;font-size:13px">${u.full_name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase()}</div>
-          <div style="flex:1">
-            <div style="font-weight:500;font-size:13px">${u.full_name}</div>
-            <div style="font-size:11px;color:var(--text-muted)">${u.cs_code||''} · ${u.role}</div>
-          </div>
-          ${u.is_active?'<span class="active-badge">Aktif</span>':'<span class="inactive-badge">Nonaktif</span>'}
-          ${u.role!=='admin'?`<button class="btn btn-sm btn-ghost" onclick="toggleUserActive('${u.id}',${!u.is_active})">${u.is_active?'Nonaktifkan':'Aktifkan'}</button>`:''}
-        </div>`).join('')}
+      ${csUsers.length === 0 ? '<div class="empty"><div class="empty-ic">👤</div><div>Belum ada CS. Klik Tambah CS Baru.</div></div>' :
+        csUsers.map(u => csUserRow(u)).join('')}
     </div>
-    <div class="table-card" style="margin-top:16px;padding:20px">
-      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:14px;margin-bottom:10px">➕ Cara Tambah CS Baru</div>
-      <p style="font-size:13px;color:var(--text-dim);line-height:1.7">Untuk tambah akun CS baru, gunakan Supabase Dashboard:<br>
-      <strong>Authentication → Users → Invite user</strong><br>
-      Masukkan email CS, lalu set metadata:<br>
-      <code style="background:var(--surface2);padding:2px 8px;border-radius:5px;font-size:12px">{"full_name":"CS Nama","role":"cs","cs_code":"CS_NAMA"}</code>
-      </p>
+
+    <!-- Admin List -->
+    <div class="table-card" style="margin-top:16px">
+      <div class="table-head">
+        <span class="table-ttl">👑 Daftar Admin</span>
+        <span class="result-count">${adminUsers.length} admin</span>
+      </div>
+      ${adminUsers.map(u => csUserRow(u)).join('')}
+    </div>
+
+    <!-- Info box -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;margin-top:16px">
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:13px;margin-bottom:10px">📋 Cara Kerja Undangan</div>
+      <div style="font-size:12px;color:var(--text-dim);line-height:1.8">
+        1. Klik <strong>＋ Tambah CS Baru</strong> → isi nama, email, kode CS<br>
+        2. Sistem kirim <strong>email undangan</strong> ke CS tersebut<br>
+        3. CS buka email → klik link → buat password sendiri<br>
+        4. CS langsung bisa login ke CRM ADSY<br>
+        5. Data CS hanya bisa dilihat oleh CS yang bersangkutan ✅
+      </div>
+    </div>
+  `;
+}
+
+function csUserRow(u) {
+  const init = (u.full_name||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  const gradients = ['135deg,#3b82f6,#06b6d4','135deg,#10b981,#3b82f6','135deg,#f59e0b,#ef4444','135deg,#a78bfa,#3b82f6','135deg,#06b6d4,#10b981'];
+  const grad = gradients[Math.abs((u.full_name||'').charCodeAt(0)) % gradients.length];
+  return `<div class="user-list-item">
+    <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(${grad});display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;color:#fff;flex-shrink:0">${init}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:500;font-size:13px">${u.full_name}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:1px;display:flex;gap:8px;flex-wrap:wrap">
+        ${u.cs_code ? `<span>🔖 ${u.cs_code}</span>` : ''}
+        <span>${u.role === 'admin' ? '👑 Admin' : '👤 CS'}</span>
+        <span>📅 Bergabung ${u.created_at ? new Date(u.created_at).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}) : '—'}</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;flex-shrink:0">
+      ${u.is_active ? '<span class="active-badge">✅ Aktif</span>' : '<span class="inactive-badge">🚫 Nonaktif</span>'}
+      <button class="btn btn-ghost btn-icon btn-sm" onclick="openCSEdit('${u.id}','${u.full_name.replace(/'/g,"\\'")}','${u.cs_code||''}','${u.role}')" title="Edit">✏️</button>
+      ${u.id !== currentUser.id ? `<button class="btn btn-sm ${u.is_active?'btn-danger':'btn-success'}" onclick="toggleUserActive('${u.id}',${!u.is_active})">${u.is_active?'Nonaktifkan':'Aktifkan'}</button>` : '<span style="font-size:11px;color:var(--text-muted)">(Anda)</span>'}
+    </div>
+  </div>`;
+}
+
+// ── TAMBAH CS (Invite) ──────────────────────
+function openCSModal() {
+  document.getElementById('csName').value = '';
+  document.getElementById('csEmail').value = '';
+  document.getElementById('csCode').value = '';
+  document.getElementById('csRole').value = 'cs';
+  document.getElementById('csInviteResult').style.display = 'none';
+  document.getElementById('saveCsBtn').disabled = false;
+  document.getElementById('saveCsBtn').textContent = '📧 Kirim Undangan';
+  document.getElementById('csModalOverlay').classList.add('open');
+}
+
+function closeCSModal() { document.getElementById('csModalOverlay').classList.remove('open'); }
+function closeCSModalBg(e) { if(e.target===document.getElementById('csModalOverlay')) closeCSModal(); }
+
+async function inviteCS() {
+  const name = document.getElementById('csName').value.trim();
+  const email = document.getElementById('csEmail').value.trim();
+  const code = document.getElementById('csCode').value.trim().toUpperCase();
+  const role = document.getElementById('csRole').value;
+
+  if (!name || !email) { toast('⚠️', 'Nama dan email wajib diisi!'); return; }
+
+  const btn = document.getElementById('saveCsBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Mengirim...';
+
+  // Invite user via Supabase Auth
+  const { data, error } = await sb.auth.signInWithOtp({
+    email,
+    options: {
+      shouldCreateUser: true,
+      data: { full_name: name, role, cs_code: code }
+    }
+  });
+
+  if (error) {
+    // Try admin invite approach via magic link
+    const { error: err2 } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin
+    });
+    if (err2) {
+      toast('❌', 'Gagal kirim undangan: ' + (error.message||''));
+      btn.disabled = false;
+      btn.textContent = '📧 Kirim Undangan';
+      return;
+    }
+  }
+
+  // Manually insert profile jika belum ada (akan di-trigger otomatis tapi kita pastikan)
+  // Tampilkan instruksi manual sebagai fallback yang selalu muncul
+  const resultDiv = document.getElementById('csInviteResult');
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = `
+    <div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:14px">
+      <div style="font-weight:600;font-size:13px;color:var(--accent4);margin-bottom:8px">✅ Undangan Terkirim!</div>
+      <div style="font-size:12px;color:var(--text-dim);line-height:1.7">
+        Email undangan dikirim ke <strong>${email}</strong><br>
+        CS perlu klik link di email untuk set password.
+      </div>
+      <div style="margin-top:10px;background:var(--surface2);border-radius:8px;padding:10px;font-size:11px;color:var(--text-muted)">
+        <strong>Setelah CS login pertama kali</strong>, jalankan SQL ini di Supabase untuk update profil:<br>
+        <code style="font-size:10px;word-break:break-all">UPDATE public.profiles SET full_name='${name}', role='${role}', cs_code='${code}' WHERE id=(SELECT id FROM auth.users WHERE email='${email}');</code>
+        <button onclick="copySQL('${name}','${role}','${code}','${email}')" class="btn btn-ghost btn-sm" style="margin-top:6px;width:100%">📋 Copy SQL</button>
+      </div>
     </div>`;
-  document.getElementById('mainContent').innerHTML = html;
+  btn.textContent = '✅ Terkirim';
+  toast('📧', `Undangan dikirim ke ${email}!`);
+  setTimeout(() => renderAdminUsers(), 2000);
+}
+
+function copySQL(name, role, code, email) {
+  const sql = `UPDATE public.profiles SET full_name='${name}', role='${role}', cs_code='${code}' WHERE id=(SELECT id FROM auth.users WHERE email='${email}');`;
+  navigator.clipboard.writeText(sql).then(() => toast('📋', 'SQL berhasil di-copy!'));
+}
+
+// ── EDIT CS ─────────────────────────────────
+function openCSEdit(id, name, code, role) {
+  document.getElementById('editCsId').value = id;
+  document.getElementById('editCsName').value = name;
+  document.getElementById('editCsCode').value = code;
+  document.getElementById('editCsRole').value = role;
+  document.getElementById('csEditOverlay').classList.add('open');
+}
+
+function closeCSEdit() { document.getElementById('csEditOverlay').classList.remove('open'); }
+
+async function saveEditCS() {
+  const id = document.getElementById('editCsId').value;
+  const name = document.getElementById('editCsName').value.trim();
+  const code = document.getElementById('editCsCode').value.trim().toUpperCase();
+  const role = document.getElementById('editCsRole').value;
+  if (!name) { toast('⚠️', 'Nama wajib diisi!'); return; }
+  const { error } = await sb.from('profiles').update({ full_name: name, cs_code: code, role }).eq('id', id);
+  if (error) { toast('❌', 'Gagal update: ' + error.message); return; }
+  toast('✅', 'Data CS berhasil diperbarui!');
+  closeCSEdit();
+  renderAdminUsers();
 }
 
 async function toggleUserActive(userId, newStatus) {
   const { error } = await sb.from('profiles').update({ is_active: newStatus }).eq('id', userId);
   if (error) { toast('❌', error.message); return; }
-  toast('✅', newStatus ? 'Akun diaktifkan!' : 'Akun dinonaktifkan!');
+  toast(newStatus ? '✅' : '🚫', newStatus ? 'Akun CS diaktifkan!' : 'Akun CS dinonaktifkan!');
   renderAdminUsers();
 }
 

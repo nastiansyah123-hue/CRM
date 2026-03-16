@@ -277,6 +277,23 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
 .user-list-item:last-child{border-bottom:none}
 .inactive-badge{background:rgba(239,68,68,.12);color:var(--danger);padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
 .active-badge{background:rgba(16,185,129,.12);color:var(--accent4);padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
+.mood-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);z-index:999;display:none;align-items:center;justify-content:center}
+.mood-overlay.open{display:flex}
+.mood-card{background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:36px 32px;text-align:center;width:100%;max-width:400px;animation:moodIn .4s cubic-bezier(.34,1.56,.64,1)}
+@keyframes moodIn{from{transform:scale(.8) translateY(20px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
+.mood-greeting{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;margin-bottom:6px}
+.mood-sub{font-size:13px;color:var(--text-muted);margin-bottom:28px}
+.mood-options{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:20px}
+.mood-btn{display:flex;flex-direction:column;align-items:center;gap:7px;padding:14px 12px;border-radius:16px;cursor:pointer;border:2px solid var(--border);background:var(--surface2);transition:all .2s;min-width:72px;user-select:none}
+.mood-btn:hover{transform:translateY(-4px) scale(1.06);border-color:var(--accent)}
+.mood-btn.selected{border-color:var(--accent);background:rgba(59,130,246,.12);transform:translateY(-4px) scale(1.06)}
+.mood-emot{font-size:34px;line-height:1}
+.mood-label{font-size:11px;font-weight:600;color:var(--text-muted)}
+.mood-btn.selected .mood-label{color:var(--accent)}
+.mood-skip{font-size:12px;color:var(--text-muted);cursor:pointer;margin-top:4px;display:inline-block}
+.mood-skip:hover{color:var(--text);text-decoration:underline}
+.mood-history{margin-top:14px;font-size:12px;color:var(--text-muted)}
+.mood-hist-row{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:6px;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -519,6 +536,44 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
   </div>
 </div>
 
+<!-- MOOD CHECK-IN MODAL -->
+<div class="mood-overlay" id="moodOverlay">
+  <div class="mood-card">
+    <div style="font-size:40px;margin-bottom:12px" id="moodTimeIcon">🌅</div>
+    <div class="mood-greeting" id="moodGreeting">Selamat Pagi!</div>
+    <div class="mood-sub" id="moodSub">Bagaimana perasaan kamu hari ini?</div>
+    <div class="mood-options">
+      <div class="mood-btn" onclick="selectMood(this,'😄','Bahagia')">
+        <span class="mood-emot">😄</span><span class="mood-label">Bahagia</span>
+      </div>
+      <div class="mood-btn" onclick="selectMood(this,'😊','Semangat')">
+        <span class="mood-emot">😊</span><span class="mood-label">Semangat</span>
+      </div>
+      <div class="mood-btn" onclick="selectMood(this,'😐','Biasa')">
+        <span class="mood-emot">😐</span><span class="mood-label">Biasa Aja</span>
+      </div>
+      <div class="mood-btn" onclick="selectMood(this,'😔','Lelah')">
+        <span class="mood-emot">😔</span><span class="mood-label">Lelah</span>
+      </div>
+      <div class="mood-btn" onclick="selectMood(this,'😢','Sedih')">
+        <span class="mood-emot">😢</span><span class="mood-label">Sedih</span>
+      </div>
+      <div class="mood-btn" onclick="selectMood(this,'😤','Stres')">
+        <span class="mood-emot">😤</span><span class="mood-label">Stres</span>
+      </div>
+      <div class="mood-btn" onclick="selectMood(this,'🔥','On Fire')">
+        <span class="mood-emot">🔥</span><span class="mood-label">On Fire!</span>
+      </div>
+      <div class="mood-btn" onclick="selectMood(this,'🤒','Kurang Sehat')">
+        <span class="mood-emot">🤒</span><span class="mood-label">Kurang Sehat</span>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="moodSaveBtn" onclick="saveMood()" style="width:100%;opacity:.4;pointer-events:none">Mulai Kerja →</button>
+    <div style="margin-top:12px"><span class="mood-skip" onclick="closeMoodModal()">Lewati</span></div>
+    <div class="mood-history" id="moodHistory"></div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"><span id="tIc">✅</span><span id="tMsg"></span></div>
 
@@ -605,6 +660,8 @@ function showApp() {
   document.getElementById('loginPage').classList.remove('show');
   document.getElementById('appShell').classList.add('show');
   initApp();
+  // Tampilkan mood check-in setelah login
+  setTimeout(() => showMoodModal(), 600);
 }
 
 // ════════════════════════════════════════════
@@ -2000,6 +2057,111 @@ function exportSelectedExcel() {
 function toggleMobSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('overlay').classList.toggle('show');
+}
+
+// ════════════════════════════════════════════
+// MOOD CHECK-IN
+// ════════════════════════════════════════════
+let selectedMoodEmot = null;
+let selectedMoodLabel = null;
+
+function showMoodModal() {
+  // Cek apakah sudah isi mood hari ini
+  const todayKey = 'mood_' + new Date().toISOString().split('T')[0];
+  const uid = currentUser?.id || 'guest';
+  const savedToday = localStorage.getItem(todayKey + '_' + uid);
+  if (savedToday) return; // sudah isi hari ini, skip
+
+  // Set greeting sesuai waktu
+  const hour = new Date().getHours();
+  const icon = hour < 11 ? '🌅' : hour < 15 ? '☀️' : hour < 18 ? '🌤️' : '🌙';
+  const salam = hour < 11 ? 'Selamat Pagi' : hour < 15 ? 'Selamat Siang' : hour < 18 ? 'Selamat Sore' : 'Selamat Malam';
+  const name = currentProfile?.full_name?.split(' ')[0] || 'Kamu';
+
+  document.getElementById('moodTimeIcon').textContent = icon;
+  document.getElementById('moodGreeting').textContent = `${salam}, ${name}! 👋`;
+  document.getElementById('moodSub').textContent = 'Bagaimana perasaan kamu hari ini?';
+
+  // Tampilkan histori 7 hari terakhir
+  const history = getMoodHistory(uid);
+  const histEl = document.getElementById('moodHistory');
+  if (history.length > 0) {
+    histEl.innerHTML = `<div style="margin-bottom:4px">Mood 7 hari terakhir:</div>
+      <div class="mood-hist-row">${history.slice(-7).map(h =>
+        `<span title="${h.label} — ${h.date}" style="font-size:22px;cursor:default">${h.emot}</span>`
+      ).join('')}</div>`;
+  } else {
+    histEl.innerHTML = '';
+  }
+
+  // Reset selection
+  selectedMoodEmot = null;
+  selectedMoodLabel = null;
+  document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+  const saveBtn = document.getElementById('moodSaveBtn');
+  saveBtn.style.opacity = '.4';
+  saveBtn.style.pointerEvents = 'none';
+
+  document.getElementById('moodOverlay').classList.add('open');
+}
+
+function selectMood(el, emot, label) {
+  document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedMoodEmot = emot;
+  selectedMoodLabel = label;
+  const saveBtn = document.getElementById('moodSaveBtn');
+  saveBtn.style.opacity = '1';
+  saveBtn.style.pointerEvents = '';
+  saveBtn.textContent = `${emot} Mulai Kerja →`;
+}
+
+function saveMood() {
+  if (!selectedMoodEmot) return;
+  const uid = currentUser?.id || 'guest';
+  const today = new Date().toISOString().split('T')[0];
+  const todayKey = 'mood_' + today + '_' + uid;
+
+  // Simpan ke localStorage
+  localStorage.setItem(todayKey, JSON.stringify({ emot: selectedMoodEmot, label: selectedMoodLabel, date: today }));
+
+  // Simpan ke histori
+  const histKey = 'mood_history_' + uid;
+  const hist = getMoodHistory(uid);
+  hist.push({ emot: selectedMoodEmot, label: selectedMoodLabel, date: today });
+  // Keep max 30 hari
+  const recent = hist.slice(-30);
+  localStorage.setItem(histKey, JSON.stringify(recent));
+
+  // Tampilkan pesan sesuai mood
+  const msgs = {
+    '😄': 'Wah semangat banget! Ayo produktif hari ini! 💪',
+    '😊': 'Semangat ya! Pasti bisa dapat banyak customer hari ini! 🌟',
+    '😐': 'Santai aja, sedikit demi sedikit. Kamu bisa! 😊',
+    '😔': 'Istirahat sejenak boleh kok. Yang penting tetap semangat! 🤗',
+    '😢': 'Hugs! Semoga harimu membaik ya. Kami support kamu! 💙',
+    '😤': 'Tarik napas dulu ya. Kamu sudah kerja keras! 🧘',
+    '🔥': 'YEAY! Hari ini bakal luar biasa! GASPOL! 🚀',
+    '🤒': 'Jaga kesehatan ya! Jangan dipaksakan kalau kurang sehat 💊',
+  };
+  const msg = msgs[selectedMoodEmot] || 'Semangat ya hari ini! 🌟';
+
+  closeMoodModal();
+  // Tampilkan pesan motivasi
+  setTimeout(() => {
+    toast(selectedMoodEmot, msg);
+  }, 300);
+}
+
+function closeMoodModal() {
+  document.getElementById('moodOverlay').classList.remove('open');
+}
+
+function getMoodHistory(uid) {
+  try {
+    const histKey = 'mood_history_' + uid;
+    return JSON.parse(localStorage.getItem(histKey) || '[]');
+  } catch { return []; }
 }
 
 // ════════════════════════════════════════════

@@ -33,6 +33,23 @@ html.light .fu-none{color:#94a3b8}
 html.light .dp-penyakit{background:#f8faff}
 html.light .wa-result{background:#f8faff}
 html.light .filter-bar{box-shadow:0 1px 3px var(--shadow)}
+/* CS CUSTOM DROPDOWN */
+.cs-dd-item{padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text-dim);display:flex;align-items:center;justify-content:space-between;transition:background .1s;user-select:none}
+.cs-dd-item:hover{background:var(--surface2);color:var(--text)}
+.cs-dd-item.active{background:rgba(59,130,246,.15);color:var(--accent);font-weight:500}
+.cs-dd-cnt{font-size:11px;font-weight:600;background:var(--surface3);border-radius:20px;padding:1px 7px;color:var(--text-muted)}
+.cs-dd-item.active .cs-dd-cnt{background:rgba(59,130,246,.2);color:var(--accent)}
+html.light .cs-dd-item:hover{background:var(--surface2)}
+html.light #csDdList{box-shadow:0 8px 24px rgba(0,0,0,.15)}
+.sel-toolbar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.25);border-radius:10px;margin-bottom:10px;animation:su .15s ease}
+.sel-count{font-weight:600;font-size:13px;color:var(--accent);flex:1}
+.sel-actions{display:flex;gap:7px;flex-wrap:wrap}
+.cb-wrap{display:flex;align-items:center;justify-content:center;width:36px}
+input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;border-radius:3px}
+thead th.cb-th{width:36px;padding:9px 0 9px 14px}
+td.cb-td{padding:10px 0 10px 14px;width:36px}
+tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
+html.light tbody tr.selected-row{background:rgba(37,99,235,.06)!important}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 .sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100}
 .logo{padding:20px 18px 16px;border-bottom:1px solid var(--border)}
@@ -274,7 +291,15 @@ tbody tr:hover .acts{opacity:1}
     </div>
     <div class="nav-sect">
       <div class="nav-label">CS</div>
-      <div id="csNav"></div>
+      <div style="padding:0 8px;position:relative" id="csDdWrapper">
+        <div id="csDdTrigger" onclick="toggleCsDd()" style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:13px;user-select:none;transition:border-color .15s">
+          <span id="csDdLabel">👥 Semua CS</span>
+          <span id="csDdArrow" style="font-size:10px;color:var(--text-muted);transition:transform .2s">▼</span>
+        </div>
+        <div id="csDdList" style="display:none;position:fixed;width:196px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:9999;overflow-y:auto;max-height:260px;padding:4px">
+          <!-- populated by JS -->
+        </div>
+      </div>
     </div>
   </nav>
   <div class="sidebar-foot">
@@ -355,9 +380,25 @@ tbody tr:hover .acts{opacity:1}
           <span class="table-ttl">Daftar Customer</span>
           <span class="result-count" id="resultCount">0 data</span>
         </div>
+        <!-- SELECTION TOOLBAR -->
+        <div id="selToolbar" style="display:none;padding:0 16px 0">
+          <div class="sel-toolbar">
+            <span class="sel-count" id="selCount">0 dipilih</span>
+            <div class="sel-actions">
+              <button class="btn btn-sm" style="background:rgba(16,185,129,.15);color:var(--accent4);border:1px solid rgba(16,185,129,.3)" onclick="exportSelectedExcel()">📊 Excel Dipilih</button>
+              <button class="btn btn-sm" style="background:rgba(16,185,129,.15);color:var(--accent4);border:1px solid rgba(16,185,129,.3)" onclick="exportSelectedCSV()">⬇️ CSV Dipilih</button>
+              <div style="width:1px;background:var(--border);margin:0 2px"></div>
+              <button class="btn btn-sm btn-ghost" onclick="exportAllExcel()">📊 Excel Semua</button>
+              <button class="btn btn-sm btn-ghost" onclick="exportCSV()">⬇️ CSV Semua</button>
+              <div style="width:1px;background:var(--border);margin:0 2px"></div>
+              <button class="btn btn-sm" style="background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.2)" onclick="clearSelection()">✕ Batal Pilih</button>
+            </div>
+          </div>
+        </div>
         <div style="overflow-x:auto">
         <table>
           <thead><tr>
+            <th class="cb-th"><input type="checkbox" id="chkAll" onchange="toggleSelectAll(this)"></th>
             <th onclick="doSort('nama')">Nama ↕</th>
             <th onclick="doSort('hp')">No HP</th>
             <th onclick="doSort('kabupaten')">Kota</th>
@@ -373,7 +414,17 @@ tbody tr:hover .acts{opacity:1}
         </div>
         <div id="emptyState" class="empty" style="display:none"><div class="empty-ic">🔍</div><div>Tidak ada data</div></div>
         <div class="pagination">
-          <span class="pg-info" id="pgInfo">-</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="pg-info" id="pgInfo">-</span>
+            <div style="width:1px;height:14px;background:var(--border)"></div>
+            <span style="font-size:12px;color:var(--text-muted)">Tampilkan:</span>
+            <select id="perPageSel" onchange="changePerPage(this.value)" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:12px;outline:none;cursor:pointer">
+              <option value="15" selected>15 / hal</option>
+              <option value="20">20 / hal</option>
+              <option value="50">50 / hal</option>
+              <option value="100">100 / hal</option>
+            </select>
+          </div>
           <div class="pg-btns" id="pgBtns"></div>
         </div>
       </div>
@@ -497,13 +548,14 @@ const COLORS=[
 let data = ALL_DATA.map((d,i)=>({...d,_ci:i%COLORS.length}));
 let filtered = [...data];
 let page = 1;
-const PER_PAGE = 15;
+let perPage = 15;
 let sortK = 'tanggal', sortA = false;
 let activeFilter = 'all';
 let activeView = 'all';
 let activeTab = 'table';
 let detailId = null;
 let editId = null;
+let selectedIds = new Set();
 
 // ===== FU HELPERS =====
 function fuDelta(dateStr){
@@ -581,21 +633,74 @@ function computeStats(){
 }
 
 function buildFilters(){
-  const csSet=[...new Set(data.map(d=>d.nama_cs).filter(Boolean))].sort();
+  // CS options handled in buildCSNav
   const kabSet=[...new Set(data.map(d=>d.kabupaten).filter(Boolean))].sort();
-  const csF=document.getElementById('csFilter');
-  const fCs=document.getElementById('fCs');
-  csSet.forEach(v=>{ csF.innerHTML+=`<option>${v}</option>`; fCs.innerHTML+=`<option>${v}</option>`; });
   kabSet.forEach(v=>{ document.getElementById('kabFilter').innerHTML+=`<option>${v}</option>`; });
 }
 
 function buildCSNav(){
   const csSet=[...new Set(data.map(d=>d.nama_cs).filter(Boolean))].sort();
-  const nav=document.getElementById('csNav');
+  const list=document.getElementById('csDdList');
+  const csFilter=document.getElementById('csFilter');
+  const fCs=document.getElementById('fCs');
+
+  // "Semua" option
+  list.innerHTML=`<div class="cs-dd-item active" data-cs="" onclick="selectCS('',this)"><span>👥 Semua CS</span><span class="cs-dd-cnt">${data.length}</span></div>`;
+
   csSet.forEach(cs=>{
     const cnt=data.filter(d=>d.nama_cs===cs).length;
-    nav.innerHTML+=`<div class="nav-item" onclick="filterByCS('${cs}',this)"><span class="ic">👤</span>${cs}<span class="nav-badge nb-dim">${cnt}</span></div>`;
+    list.innerHTML+=`<div class="cs-dd-item" data-cs="${cs}" onclick="selectCS('${cs}',this)"><span>👤 ${cs}</span><span class="cs-dd-cnt">${cnt}</span></div>`;
+    csFilter.innerHTML+=`<option>${cs}</option>`;
+    fCs.innerHTML+=`<option>${cs}</option>`;
   });
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', e=>{
+    const wrapper=document.getElementById('csDdWrapper');
+    if(wrapper && !wrapper.contains(e.target)) closeCsDd();
+  });
+}
+
+function toggleCsDd(){
+  const list=document.getElementById('csDdList');
+  const trigger=document.getElementById('csDdTrigger');
+  const arrow=document.getElementById('csDdArrow');
+  const isOpen = list.style.display!=='none';
+  if(isOpen){ closeCsDd(); return; }
+  // Position the dropdown below the trigger using fixed coords
+  const rect=trigger.getBoundingClientRect();
+  list.style.display='block';
+  list.style.top=(rect.bottom+4)+'px';
+  list.style.left=rect.left+'px';
+  list.style.width=rect.width+'px';
+  arrow.style.transform='rotate(180deg)';
+  trigger.style.borderColor='var(--accent)';
+}
+
+function closeCsDd(){
+  const list=document.getElementById('csDdList');
+  const arrow=document.getElementById('csDdArrow');
+  const trigger=document.getElementById('csDdTrigger');
+  list.style.display='none';
+  arrow.style.transform='rotate(0deg)';
+  trigger.style.borderColor='var(--border)';
+}
+
+function selectCS(cs, el){
+  // Update active state
+  document.querySelectorAll('#csDdList .cs-dd-item').forEach(i=>i.classList.remove('active'));
+  el.classList.add('active');
+  // Update trigger label
+  document.getElementById('csDdLabel').textContent = cs ? '👤 '+cs : '👥 Semua CS';
+  closeCsDd();
+  filterByCSSelect(cs);
+}
+
+function filterByCSSelect(cs){
+  document.getElementById('csFilter').value=cs;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  activeView='all';
+  doSearch();
 }
 
 // ===== VIEW SWITCHING =====
@@ -609,6 +714,8 @@ function switchView(view, navEl){
   document.getElementById('searchInput').value='';
   document.getElementById('csFilter').value='';
   document.getElementById('kabFilter').value='';
+  document.getElementById('csDdLabel').textContent='👥 Semua CS';
+  document.querySelectorAll('#csDdList .cs-dd-item').forEach((i,idx)=>i.classList.toggle('active',idx===0));
   document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
   document.querySelector('.pill').classList.add('active');
   activeFilter='all';
@@ -717,6 +824,9 @@ function resetFilters(){
   document.getElementById('searchInput').value='';
   document.getElementById('csFilter').value='';
   document.getElementById('kabFilter').value='';
+  // reset custom CS dropdown
+  document.getElementById('csDdLabel').textContent='👥 Semua CS';
+  document.querySelectorAll('#csDdList .cs-dd-item').forEach((i,idx)=>i.classList.toggle('active',idx===0));
   document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
   document.querySelector('.pill').classList.add('active');
   activeFilter='all';
@@ -726,10 +836,10 @@ function resetFilters(){
 // ===== RENDER TABLE =====
 function renderTable(){
   const total=filtered.length;
-  const pages=Math.max(1,Math.ceil(total/PER_PAGE));
+  const pages=Math.max(1,Math.ceil(total/perPage));
   if(page>pages) page=pages;
-  const start=(page-1)*PER_PAGE;
-  const pageData=filtered.slice(start,start+PER_PAGE);
+  const start=(page-1)*perPage;
+  const pageData=filtered.slice(start,start+perPage);
 
   const tbody=document.getElementById('tbody');
   const empty=document.getElementById('emptyState');
@@ -738,7 +848,7 @@ function renderTable(){
   if(pageData.length===0){ tbody.innerHTML=''; empty.style.display=''; }
   else { empty.style.display='none'; tbody.innerHTML=pageData.map(d=>rowHTML(d)).join(''); }
 
-  document.getElementById('pgInfo').textContent=total===0?'Tidak ada data':`${start+1}–${Math.min(start+PER_PAGE,total)} dari ${total}`;
+  document.getElementById('pgInfo').textContent=total===0?'Tidak ada data':`${start+1}–${Math.min(start+perPage,total)} dari ${total}`;
 
   const pgBtns=document.getElementById('pgBtns');
   pgBtns.innerHTML='';
@@ -747,6 +857,8 @@ function renderTable(){
   if(ps>1){const b=mk('pg-btn','«');b.onclick=()=>{page=1;renderTable()};pgBtns.appendChild(b);}
   for(let i=ps;i<=pe;i++){const b=mk('pg-btn'+(i===page?' active':''),i);b.onclick=(pi=>()=>{page=pi;renderTable();})(i);pgBtns.appendChild(b);}
   if(pe<pages){const b=mk('pg-btn','»');b.onclick=()=>{page=pages;renderTable()};pgBtns.appendChild(b);}
+  syncChkAll();
+  updateSelToolbar();
 }
 
 function mk(cls,txt){const d=document.createElement('div');d.className=cls;d.textContent=txt;return d;}
@@ -763,7 +875,8 @@ function rowHTML(d){
   const tagsH=tags.length?tags.join(' '):'<span style="color:var(--text-muted);font-size:11px">—</span>';
   const csShort=d.nama_cs.replace(/^CS\s*/i,'').replace(/^Cs\s*/i,'');
 
-  return `<tr onclick="openDetail(${d.id})">
+  return `<tr onclick="openDetail(${d.id})" id="row-${d.id}" class="${selectedIds.has(d.id)?'selected-row':''}">
+    <td class="cb-td" onclick="event.stopPropagation()"><input type="checkbox" ${selectedIds.has(d.id)?'checked':''} onchange="toggleRow(${d.id},this)"></td>
     <td><div class="cust-info">
       <div class="c-ava" style="background:${col.bg};color:${col.c}">${init}</div>
       <div><div class="c-name">${d.nama}</div><div class="c-hp">${d.kabupaten||'—'}</div></div>
@@ -1023,9 +1136,8 @@ function delCustomer(id){
 }
 
 function exportCSV(){
-  const headers=['ID','Nama','No HP','Tanggal','Kecamatan','Kabupaten','Provinsi','CS','Status Paket','Usia','Gender','Penyakit','Pekerjaan','CRM','Testimoni','Manjur','Zonk','Promo','Last FU','Jadwal FU','Status FU','Catatan'];
-  const rows=filtered.map(d=>[d.id,d.nama,d.hp,d.tanggal,d.kecamatan,d.kabupaten,d.provinsi,d.nama_cs,d.status_paket,d.usia,d.gender,d.penyakit,d.pekerjaan,d.crm?'Ya':'Tidak',d.testimoni?'Ya':'Tidak',d.manjur?'Ya':'Tidak',d.zonk?'Ya':'Tidak',d.promo?'Ya':'Tidak',d.last_fu,d.jadwal_fu,fuStatus(d),d.catatan]);
-  const csv=[headers,...rows].map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const rows=getExportRows(filtered);
+  const csv=[EXPORT_HEADERS,...rows].map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
   a.download='NMA_CRM_'+TODAY_STR+'.csv';
@@ -1425,6 +1537,138 @@ function toast(ic,msg){
   const t=document.getElementById('toast');
   t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ===== SELECTION =====
+function toggleRow(id, cb){
+  if(cb.checked) selectedIds.add(id); else selectedIds.delete(id);
+  const row = document.getElementById('row-'+id);
+  if(row) row.classList.toggle('selected-row', cb.checked);
+  updateSelToolbar();
+  syncChkAll();
+}
+
+function toggleSelectAll(cb){
+  // Select/deselect ONLY current page rows
+  const pageIds = getCurrentPageIds();
+  if(cb.checked){
+    pageIds.forEach(id=>selectedIds.add(id));
+  } else {
+    pageIds.forEach(id=>selectedIds.delete(id));
+  }
+  renderTable();
+  updateSelToolbar();
+}
+
+function syncChkAll(){
+  const chkAll = document.getElementById('chkAll');
+  if(!chkAll) return;
+  const pageIds = getCurrentPageIds();
+  if(pageIds.length===0){ chkAll.checked=false; chkAll.indeterminate=false; return; }
+  const allChecked = pageIds.every(id=>selectedIds.has(id));
+  const anyChecked = pageIds.some(id=>selectedIds.has(id));
+  chkAll.checked = allChecked;
+  chkAll.indeterminate = anyChecked && !allChecked;
+}
+
+function getCurrentPageIds(){
+  const start=(page-1)*perPage;
+  return filtered.slice(start,start+perPage).map(d=>d.id);
+}
+
+function updateSelToolbar(){
+  const n = selectedIds.size;
+  const tb = document.getElementById('selToolbar');
+  tb.style.display = n>0 ? '' : 'none';
+  document.getElementById('selCount').textContent = `${n} customer dipilih`;
+}
+
+function clearSelection(){
+  selectedIds.clear();
+  renderTable();
+  updateSelToolbar();
+}
+
+function changePerPage(val){
+  perPage = parseInt(val);
+  page = 1;
+  clearSelection();
+}
+
+// ===== EXPORT HELPERS =====
+function getExportRows(dataArr){
+  return dataArr.map(d=>{
+    const delta=fuDelta(d.jadwal_fu);
+    const fuSt=fuStatus(d);
+    const statusLabel=d.jadwal_fu==='recall'?'Perlu Recall':
+      fuSt==='overdue'?'TERLAMBAT':fuSt==='today'?'HARI INI':fuSt==='soon'?'Segera':fuSt==='upcoming'?'Mendatang':'—';
+    const deltaText=d.jadwal_fu==='recall'?'Perlu Recall':delta===null?'':delta<0?`Terlambat ${Math.abs(delta)} hari`:delta===0?'Hari Ini':`${delta} hari lagi`;
+    const fuDate=d.jadwal_fu&&d.jadwal_fu!=='recall'?new Date(d.jadwal_fu).toLocaleDateString('id-ID'):d.jadwal_fu||'';
+    return [d.id,d.nama,d.hp,d.tanggal,d.kecamatan,d.kabupaten,d.provinsi,d.nama_cs,d.status_paket,
+      d.usia,d.gender,d.penyakit,d.pekerjaan,d.crm?'Ya':'Tidak',d.testimoni?'Ya':'Tidak',
+      d.manjur?'Ya':'Tidak',d.zonk?'Ya':'Tidak',d.promo?'Ya':'Tidak',
+      d.last_fu||'',fuDate,statusLabel,deltaText,d.catatan||''];
+  });
+}
+
+const EXPORT_HEADERS=['ID','Nama','No HP','Tanggal','Kecamatan','Kabupaten','Provinsi','CS','Status Paket','Usia','Gender','Penyakit','Pekerjaan','CRM','Testimoni','Manjur','Zonk','Promo','Last FU','Jadwal FU','Status FU','Hari FU','Catatan'];
+
+function buildExcelSheet(dataArr, title){
+  const rows=getExportRows(dataArr);
+  const ws=XLSX.utils.aoa_to_sheet([EXPORT_HEADERS,...rows]);
+  ws['!cols']=[{wch:4},{wch:22},{wch:16},{wch:12},{wch:16},{wch:18},{wch:16},{wch:14},{wch:12},{wch:10},{wch:10},{wch:35},{wch:20},{wch:6},{wch:10},{wch:8},{wch:6},{wch:6},{wch:12},{wch:16},{wch:12},{wch:18},{wch:30}];
+  // Style header
+  const range=XLSX.utils.decode_range(ws['!ref']);
+  for(let c=range.s.c;c<=range.e.c;c++){
+    const cell=XLSX.utils.encode_cell({r:0,c});
+    if(ws[cell]) ws[cell].s={font:{bold:true,color:{rgb:'FFFFFF'},sz:10},fill:{fgColor:{rgb:'1E3A5F'}},alignment:{horizontal:'center',vertical:'center'}};
+  }
+  ws['!freeze']={xSplit:0,ySplit:1};
+  return ws;
+}
+
+function exportSelectedExcel(){
+  if(!selectedIds.size){toast('⚠️','Pilih dulu customer yang ingin diexport!');return;}
+  if(typeof XLSX==='undefined'){toast('⚠️','Library Excel belum siap');return;}
+  const sel=data.filter(d=>selectedIds.has(d.id));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,buildExcelSheet(sel,'Data Dipilih'),'Data Dipilih');
+  XLSX.writeFile(wb,`NMA_Selected_${sel.length}cust_${TODAY_STR}.xlsx`);
+  toast('📊',`Excel ${sel.length} customer berhasil didownload!`);
+}
+
+function exportSelectedCSV(){
+  if(!selectedIds.size){toast('⚠️','Pilih dulu customer yang ingin diexport!');return;}
+  const sel=data.filter(d=>selectedIds.has(d.id));
+  const rows=getExportRows(sel);
+  const csv=[EXPORT_HEADERS,...rows].map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+  a.download=`NMA_Selected_${sel.length}cust_${TODAY_STR}.csv`;
+  a.click();
+  toast('⬇️',`CSV ${sel.length} customer berhasil didownload!`);
+}
+
+function exportAllExcel(){
+  if(typeof XLSX==='undefined'){toast('⚠️','Library Excel belum siap');return;}
+  toast('⏳','Menyiapkan Excel...');
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,buildExcelSheet(filtered,'Semua Data'),'Data NMA');
+  // Sheet ringkasan per CS
+  const csSet=[...new Set(filtered.map(d=>d.nama_cs).filter(Boolean))].sort();
+  const sumRows=csSet.map(cs=>{
+    const cd=filtered.filter(d=>d.nama_cs===cs);
+    return [cs,cd.length,cd.filter(d=>d.status_paket==='DELIVERED').length,
+      cd.filter(d=>d.crm).length,cd.filter(d=>d.testimoni).length,
+      cd.filter(d=>fuStatus(d)==='overdue').length];
+  });
+  const ws2=XLSX.utils.aoa_to_sheet([['CS','Total','Delivered','CRM','Testimoni','FU Terlambat'],...sumRows]);
+  ws2['!cols']=[{wch:18},{wch:8},{wch:10},{wch:8},{wch:10},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Ringkasan CS');
+  setTimeout(()=>{
+    XLSX.writeFile(wb,`NMA_CRM_Semua_${TODAY_STR}.xlsx`);
+    toast('📊',`Excel ${filtered.length} customer berhasil didownload!`);
+  },300);
 }
 
 // ===== THEME =====

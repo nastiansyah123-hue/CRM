@@ -850,8 +850,22 @@ function updateAvatarUI(avatarUrl, initials) {
 }
 
 function buildSidebarNav() {
-  const isAdmin = ['admin','admin_data'].includes(currentProfile?.role);
+  const isAdmin = currentProfile?.role === 'admin';
+  const isAdminData = currentProfile?.role === 'admin_data';
+  const isCS = currentProfile?.role === 'cs';
   const nav = document.getElementById('sidebarNav');
+
+  if (isAdminData) {
+    nav.innerHTML = `
+      <div class="nav-sect">
+        <div class="nav-label">Admin Data</div>
+        <div class="nav-item" onclick="switchView('admin_import',this)"><span class="ic">📥</span>Upload Data</div>
+        <div class="nav-item" onclick="switchView('admin_cs',this)"><span class="ic">👥</span>Lihat Per CS</div>
+        <div class="nav-item" onclick="switchView('db',this)"><span class="ic">📋</span>Database Customer<span class="nav-badge nb-blue" id="navAll">0</span></div>
+      </div>
+    \`;
+    return;
+  }
   nav.innerHTML = `
     <div class="nav-sect">
       <div class="nav-label">Menu</div>
@@ -859,7 +873,7 @@ function buildSidebarNav() {
       <div class="nav-item" onclick="switchView('fu_overdue',this)"><span class="ic">🔴</span>FU Terlambat<span class="nav-badge nb-red" id="navOverdue">0</span></div>
       <div class="nav-item" onclick="switchView('fu_today',this)"><span class="ic">🟡</span>FU Hari Ini<span class="nav-badge nb-orange" id="navToday">0</span></div>
       <div class="nav-item" onclick="switchView('fu_week',this)"><span class="ic">🟢</span>FU 7 Hari<span class="nav-badge nb-green" id="navWeek">0</span></div>
-      <div class="nav-item" onclick="switchView('cs_import',this)"><span class="ic">📥</span>Import Data</div>
+      ${isCS ? `<div class="nav-item" onclick="switchView('cs_import',this)"><span class="ic">📥</span>Import Data</div>` : ''}
     </div>
     <div class="nav-sect">
       <div class="nav-label">Filter Label</div>

@@ -1053,12 +1053,12 @@ function updateStats() {
 // ════════════════════════════════════════════
 // VIEW SWITCHING
 // ════════════════════════════════════════════
-function switchView(view, navEl) {
+function switchView(view, navEl, keepFilter) {
   activeView = view;
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   if (navEl) navEl.classList.add('active');
   document.getElementById('searchInput').value = '';
-  activeFilter = 'all';
+  if (!keepFilter) activeFilter = 'all';
   // Special admin views
   if (view === 'admin_cs') { renderAdminCS(); return; }
   if (view === 'admin_import') { renderAdminImport(); return; }
@@ -1713,30 +1713,30 @@ function renderProgresOrderan() {
 
     <!-- Stat cards -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px">
-      <div onclick="setPill('all');switchView('db',null)" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div onclick="activeFilter='all';switchView('db',null,true)" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
         <div style="font-size:28px;margin-bottom:6px">📦</div>
         <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:28px">${total}</div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Total Orderan</div>
       </div>
-      <div onclick="setPill('delivered');switchView('db',null)" style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#10b981'" onmouseout="this.style.borderColor='rgba(16,185,129,.25)'">
+      <div onclick="activeFilter='delivered';switchView('db',null,true)" style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#10b981'" onmouseout="this.style.borderColor='rgba(16,185,129,.25)'">
         <div style="font-size:28px;margin-bottom:6px">✅</div>
         <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:28px;color:#10b981">${delivered}</div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Delivered <span style="color:#10b981;font-weight:600">${pct(delivered)}%</span></div>
         <div style="margin-top:8px;height:4px;background:var(--surface2);border-radius:2px"><div style="height:100%;width:${pct(delivered)}%;background:#10b981;border-radius:2px"></div></div>
       </div>
-      <div onclick="setPill('pending');switchView('db',null)" style="background:rgba(100,116,139,.06);border:1px solid var(--border);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div onclick="activeFilter='pending';switchView('db',null,true)" style="background:rgba(100,116,139,.06);border:1px solid var(--border);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
         <div style="font-size:28px;margin-bottom:6px">🔄</div>
         <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:28px;color:var(--text-dim)">${proses}</div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:2px">On Proses <span style="font-weight:600">${pct(proses)}%</span></div>
         <div style="margin-top:8px;height:4px;background:var(--surface2);border-radius:2px"><div style="height:100%;width:${pct(proses)}%;background:var(--text-muted);border-radius:2px"></div></div>
       </div>
-      <div onclick="setPill('undell');switchView('db',null)" style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#a855f7'" onmouseout="this.style.borderColor='rgba(168,85,247,.2)'">
+      <div onclick="activeFilter='undell';switchView('db',null,true)" style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#a855f7'" onmouseout="this.style.borderColor='rgba(168,85,247,.2)'">
         <div style="font-size:28px;margin-bottom:6px">⚠️</div>
         <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:28px;color:#a855f7">${undell}</div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Undell <span style="color:#a855f7;font-weight:600">${pct(undell)}%</span></div>
         <div style="margin-top:8px;height:4px;background:var(--surface2);border-radius:2px"><div style="height:100%;width:${pct(undell)}%;background:#a855f7;border-radius:2px"></div></div>
       </div>
-      <div onclick="setPill('rts');switchView('db',null)" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--danger)'" onmouseout="this.style.borderColor='rgba(239,68,68,.2)'">
+      <div onclick="activeFilter='rts';switchView('db',null,true)" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--danger)'" onmouseout="this.style.borderColor='rgba(239,68,68,.2)'">
         <div style="font-size:28px;margin-bottom:6px">↩️</div>
         <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:28px;color:var(--danger)">${rts}</div>
         <div style="font-size:12px;color:var(--text-muted);margin-top:2px">RTS <span style="color:var(--danger);font-weight:600">${pct(rts)}%</span></div>

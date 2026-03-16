@@ -76,7 +76,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .nb-dim{background:var(--surface3);color:var(--text-muted)}
 .sidebar-foot{padding:12px;border-top:1px solid var(--border);position:relative}
 .user-card{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;background:var(--surface2)}
-.user-ava{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;color:#fff;flex-shrink:0;background-size:cover;background-position:center;overflow:hidden}
+.user-ava{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;color:#fff;flex-shrink:0;overflow:hidden}
 .user-name{font-size:12px;font-weight:500}
 .user-role{font-size:10px;color:var(--text-muted);text-transform:capitalize}
 .logout-btn{margin-left:auto;cursor:pointer;color:var(--text-muted);font-size:16px;padding:4px;border-radius:5px;transition:color .15s}
@@ -401,7 +401,7 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
         <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:13px;margin-bottom:12px">✏️ Edit Profil</div>
         <!-- Avatar preview + upload -->
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-          <div id="profileAvaPreview" style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:700;font-size:18px;color:#fff;cursor:pointer;flex-shrink:0;background-size:cover;background-position:center;overflow:hidden;border:2px solid var(--border)" onclick="document.getElementById('avatarInput').click()" title="Ganti foto">?</div>
+          <div id="profileAvaPreview" style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:700;font-size:18px;color:#fff;cursor:pointer;flex-shrink:0;overflow:hidden;border:2px solid var(--border)" onclick="document.getElementById('avatarInput').click()" title="Ganti foto">?</div>
           <div>
             <button class="btn btn-ghost btn-sm" onclick="document.getElementById('avatarInput').click()">📷 Ganti Foto</button>
             <div style="font-size:10px;color:var(--text-muted);margin-top:4px">Max 2MB, JPG/PNG</div>
@@ -837,13 +837,11 @@ function updateAvatarUI(avatarUrl, initials) {
     const el = document.getElementById(id);
     if (!el) return;
     if (avatarUrl) {
-      el.style.backgroundImage = `url(${avatarUrl})`;
-      el.style.background = `url(${avatarUrl}) center/cover`;
-      el.textContent = '';
+      el.innerHTML = `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.parentElement.innerHTML='${initials||'?'}'">`;
+      el.style.background = 'transparent';
     } else {
-      el.style.backgroundImage = '';
+      el.innerHTML = initials || '?';
       el.style.background = 'linear-gradient(135deg,var(--accent),var(--accent2))';
-      el.textContent = initials || '?';
     }
   });
 }
@@ -1937,7 +1935,7 @@ async function renderAdminCS() {
         const avatarUrl = avatarMap[cs.cs_id];
         const avaStyle = avatarUrl ? `background-image:url(${avatarUrl});background-size:cover;background-position:center` : '';
         const avaContent = avatarUrl ? '' : init;
-        const moodHTML = mood
+        const moodHTML = mood && mood.emot
           ? `<div style="display:flex;align-items:center;gap:6px;margin-top:10px;padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
               <span style="font-size:22px">${mood.emot}</span>
               <div>
@@ -2305,7 +2303,8 @@ async function uploadAvatar(input) {
   toast('⏳', 'Mengupload foto...');
 
   const ext = file.name.split('.').pop().toLowerCase();
-  const path = `${currentUser.id}/avatar.${ext}`;
+  // Simpan langsung di root bucket (bukan subfolder)
+  const path = `${currentUser.id}.${ext}`;
 
   const { error: upErr } = await sbAdmin.storage
     .from('avatars')
@@ -2313,8 +2312,8 @@ async function uploadAvatar(input) {
 
   if (upErr) { toast('❌', 'Gagal upload: ' + upErr.message); return; }
 
-  const { data: urlData } = sbAdmin.storage.from('avatars').getPublicUrl(path);
-  const avatarUrl = urlData.publicUrl + '?t=' + Date.now();
+  // Paksa public URL (bukan signed URL)
+  const avatarUrl = `https://rudkeajhbtgtltcbzqlg.supabase.co/storage/v1/object/public/avatars/${path}?t=${Date.now()}`;
 
   const { error: updateErr } = await sb.from('profiles')
     .update({ avatar_url: avatarUrl })

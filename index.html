@@ -2076,7 +2076,8 @@ function showMoodModal() {
   const hour = new Date().getHours();
   const icon = hour < 11 ? '🌅' : hour < 15 ? '☀️' : hour < 18 ? '🌤️' : '🌙';
   const salam = hour < 11 ? 'Selamat Pagi' : hour < 15 ? 'Selamat Siang' : hour < 18 ? 'Selamat Sore' : 'Selamat Malam';
-  const name = currentProfile?.full_name?.split(' ')[0] || 'Kamu';
+  const name = (currentProfile?.full_name || currentUser?.email || 'Kamu')
+    .replace(/^CS\s*/i, '').replace(/^CRM\s*/i, '').split(' ')[0];
 
   document.getElementById('moodTimeIcon').textContent = icon;
   document.getElementById('moodGreeting').textContent = `${salam}, ${name}! 👋`;

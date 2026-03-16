@@ -1708,7 +1708,10 @@ function renderProgresOrderan() {
   const pct = (n) => total ? Math.round(n/total*100) : 0;
 
   document.getElementById('mainContent').innerHTML = `
-    <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;margin-bottom:16px">📊 Ringkasan Status Pengiriman</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px">📊 Ringkasan Status Pengiriman</div>
+      <button class="btn btn-ghost btn-sm" onclick="loadCustomers().then(()=>switchView('cs_progres',null))">🔄 Refresh</button>
+    </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px">
       <div onclick="showProgresDetail('all')" style="background:var(--surface);border:2px solid var(--border);border-radius:14px;padding:18px;cursor:pointer;transition:all .2s" id="pc-all">
         <div style="font-size:24px;margin-bottom:6px">📦</div>
@@ -2063,6 +2066,8 @@ async function doUpdateProgres() {
     </div>`;
   progresData = [];
   toast('✅', `${updated} customer berhasil diupdate!`);
+  // Reload data agar statistik terupdate
+  await loadCustomers();
 }
 
 // ════════════════════════════════════════════

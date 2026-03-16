@@ -1938,6 +1938,10 @@ async function doImport() {
   let success = 0, failed = 0, unmatched = 0;
   const BATCH = 1000;
 
+  // DEBUG: log csMap dan sample data
+  console.log('csMap keys:', Object.keys(csMap));
+  console.log('Sample _cs_name:', importData.slice(0,3).map(d=>d._cs_name));
+
   // Siapkan semua rows dulu
   const allRows = importData.map(d => {
     let cs_id = d._force_cs || null;

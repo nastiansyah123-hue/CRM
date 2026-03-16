@@ -647,6 +647,7 @@ async function doRegister() {
 }
 
 async function doLogout() {
+  try { localStorage.removeItem('crm_last_view'); } catch(e) {}
   await sb.auth.signOut();
   customers = []; filtered = []; csStats = [];
   toast('👋', 'Sampai jumpa!');
@@ -661,8 +662,36 @@ function initApp() {
   document.getElementById('userRole').textContent = p?.role === 'admin' ? '👑 SPV' : p?.role === 'admin_data' ? '📊 Admin Data' : '💬 CRM';
   document.getElementById('sidebarSub').textContent = p?.role === 'admin' ? 'SPV Panel' : p?.role === 'admin_data' ? 'Admin Data Panel' : 'CRM Panel';
   buildSidebarNav();
-  if (p?.role === 'admin_data') renderUpdateProgres();
-  else loadCustomers();
+
+  // Restore halaman terakhir yang dibuka sebelum browser di-refresh
+  const lastView = (() => { try { return localStorage.getItem('crm_last_view') || 'db'; } catch(e) { return 'db'; } })();
+
+  if (p?.role === 'admin_data') {
+    // Admin Data: restore ke last view, default ke update_progres
+    const adminDataViews = ['update_progres','admin_import','admin_cs','db'];
+    const view = adminDataViews.includes(lastView) ? lastView : 'update_progres';
+    restoreView(view);
+  } else {
+    // CS / Admin / SPV: restore ke last view, default ke db
+    restoreView(lastView);
+  }
+}
+
+// Restore view setelah browser refresh — load data dulu lalu tampilkan view yang dimaksud
+async function restoreView(view) {
+  // View yang butuh data customers dulu sebelum bisa ditampilkan
+  const needsCustomers = new Set([...DB_VIEWS, 'cs_progres']);
+
+  if (needsCustomers.has(view)) {
+    // Load data dulu, lalu switch ke view yang diinginkan
+    await loadCustomers();
+    if (view !== 'db') switchView(view, null);
+  } else {
+    // View seperti admin_cs, admin_import, update_progres, admin_users — langsung tampilkan
+    // tapi tetap load customers di background untuk stats
+    switchView(view, null);
+    loadCustomers(); // background, tidak di-await
+  }
 }
 
 function updateAvatarUI(avatarUrl, initials) {
@@ -842,6 +871,8 @@ function updateStats() {
 // ════════ VIEW SWITCHING ════════
 function switchView(view, navEl, keepFilter) {
   activeView = view;
+  // Simpan view terakhir ke localStorage supaya tidak reset saat browser di-refresh
+  try { localStorage.setItem('crm_last_view', view); } catch(e) {}
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   if (navEl) navEl.classList.add('active');
   document.getElementById('searchInput').value = '';

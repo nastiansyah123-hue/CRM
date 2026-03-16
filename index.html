@@ -76,7 +76,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .nb-dim{background:var(--surface3);color:var(--text-muted)}
 .sidebar-foot{padding:12px;border-top:1px solid var(--border)}
 .user-card{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;background:var(--surface2)}
-.user-ava{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;color:#fff;flex-shrink:0}
+.user-ava{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;color:#fff;flex-shrink:0;background-size:cover;background-position:center;overflow:hidden}
 .user-name{font-size:12px;font-weight:500}
 .user-role{font-size:10px;color:var(--text-muted);text-transform:capitalize}
 .logout-btn{margin-left:auto;cursor:pointer;color:var(--text-muted);font-size:16px;padding:4px;border-radius:5px;transition:color .15s}
@@ -386,13 +386,17 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
     </nav>
     <div class="sidebar-foot">
       <div class="user-card">
-        <div class="user-ava" id="userAva">?</div>
+        <div style="position:relative;flex-shrink:0;cursor:pointer" onclick="openAvatarUpload()" title="Ganti foto profil">
+          <div class="user-ava" id="userAva">?</div>
+          <div style="position:absolute;bottom:-2px;right:-2px;width:14px;height:14px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;border:2px solid var(--surface2)">📷</div>
+        </div>
         <div style="flex:1;min-width:0">
           <div class="user-name" id="userName">–</div>
           <div class="user-role" id="userRole">–</div>
         </div>
         <span class="logout-btn" onclick="doLogout()" title="Keluar">⏻</span>
       </div>
+      <input type="file" id="avatarInput" accept="image/*" style="display:none" onchange="uploadAvatar(this)">
     </div>
   </div>
 
@@ -793,7 +797,14 @@ async function doLogout() {
 function initApp() {
   const p = currentProfile;
   const initials = (p?.full_name||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-  document.getElementById('userAva').textContent = initials;
+  const avaEl = document.getElementById('userAva');
+  if (p?.avatar_url) {
+    avaEl.style.backgroundImage = `url(${p.avatar_url})`;
+    avaEl.textContent = '';
+  } else {
+    avaEl.style.backgroundImage = '';
+    avaEl.textContent = initials;
+  }
   document.getElementById('userName').textContent = p?.full_name || currentUser.email;
   document.getElementById('userRole').textContent = p?.role === 'admin' ? '👑 Admin' : '👤 Customer Service';
   document.getElementById('sidebarSub').textContent = p?.role === 'admin' ? 'Admin Panel' : 'CS Panel';
@@ -1872,6 +1883,11 @@ async function renderAdminCS() {
   const moodMap = {};
   (moods||[]).forEach(m => { moodMap[m.cs_id] = m; });
 
+  // Load avatar semua CS sekaligus
+  const { data: allProfiles } = await sb.from('profiles').select('id,avatar_url').eq('role','cs');
+  const avatarMap = {};
+  (allProfiles||[]).forEach(p => { avatarMap[p.id] = p.avatar_url; });
+
   const today = new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long'});
   const html = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
@@ -1882,6 +1898,9 @@ async function renderAdminCS() {
       ${csStats.map(cs => {
         const init = cs.cs_name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
         const mood = moodMap[cs.cs_id];
+        const avatarUrl = avatarMap[cs.cs_id];
+        const avaStyle = avatarUrl ? `background-image:url(${avatarUrl});background-size:cover;background-position:center` : '';
+        const avaContent = avatarUrl ? '' : init;
         const moodHTML = mood
           ? `<div style="display:flex;align-items:center;gap:6px;margin-top:10px;padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
               <span style="font-size:22px">${mood.emot}</span>
@@ -1896,7 +1915,7 @@ async function renderAdminCS() {
              </div>`;
         return `<div class="cs-card" onclick="viewCSData('${cs.cs_id}','${cs.cs_name}')">
           <div class="cs-card-head">
-            <div class="cs-card-ava">${init}</div>
+            <div class="cs-card-ava" style="${avaStyle}">${avaContent}</div>
             <div>
               <div class="cs-card-name">${cs.cs_name}</div>
               <div class="cs-card-code">${cs.cs_code || ''} ${!cs.is_active?'<span class="inactive-badge">Nonaktif</span>':'<span class="active-badge">Aktif</span>'}</div>
@@ -2189,6 +2208,51 @@ function exportSelectedExcel() {
 function toggleMobSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('overlay').classList.toggle('show');
+}
+
+// ════════════════════════════════════════════
+// AVATAR UPLOAD
+// ════════════════════════════════════════════
+function openAvatarUpload() {
+  document.getElementById('avatarInput').click();
+}
+
+async function uploadAvatar(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { toast('⚠️', 'Ukuran foto max 2MB!'); return; }
+
+  toast('⏳', 'Mengupload foto...');
+
+  const ext = file.name.split('.').pop();
+  const path = `avatars/${currentUser.id}.${ext}`;
+
+  // Upload ke Supabase Storage
+  const { error: upErr } = await sbAdmin.storage
+    .from('avatars')
+    .upload(path, file, { upsert: true, contentType: file.type });
+
+  if (upErr) { toast('❌', 'Gagal upload: ' + upErr.message); return; }
+
+  // Get public URL
+  const { data: urlData } = sbAdmin.storage.from('avatars').getPublicUrl(path);
+  const avatarUrl = urlData.publicUrl + '?t=' + Date.now(); // cache bust
+
+  // Update profile
+  const { error: updateErr } = await sb.from('profiles')
+    .update({ avatar_url: avatarUrl })
+    .eq('id', currentUser.id);
+
+  if (updateErr) { toast('❌', 'Gagal simpan: ' + updateErr.message); return; }
+
+  // Update UI langsung
+  currentProfile.avatar_url = avatarUrl;
+  const avaEl = document.getElementById('userAva');
+  avaEl.style.backgroundImage = `url(${avatarUrl})`;
+  avaEl.textContent = '';
+
+  toast('✅', 'Foto profil berhasil diupdate!');
+  input.value = '';
 }
 
 // ════════════════════════════════════════════

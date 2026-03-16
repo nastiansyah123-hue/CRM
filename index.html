@@ -1171,7 +1171,6 @@ function renderCustomerView() {
   // Stats
   const statsHTML = `<div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">
     <div class="stat-card c1" onclick="switchView('db',null)"><div class="stat-ic">👥</div><div class="stat-val">${customers.length}</div><div class="stat-lbl">Total Customer</div></div>
-    <div class="stat-card c2" onclick="switchView('delivered',null)"><div class="stat-ic">✅</div><div class="stat-val">${customers.filter(d=>d.status_paket==='DELIVERED').length}</div><div class="stat-lbl">Delivered</div></div>
     <div class="stat-card c4" onclick="selectRO('ro1',null);switchView('ro1',null)"><div class="stat-ic">🛒</div><div class="stat-val">${customers.filter(d=>d.ro1).length}</div><div class="stat-lbl">RO 1</div></div>
     <div class="stat-card c3" onclick="selectRO('ro2',null);switchView('ro2',null)"><div class="stat-ic">🛒</div><div class="stat-val">${customers.filter(d=>d.ro2).length}</div><div class="stat-lbl">RO 2</div></div>
     <div class="stat-card c5" onclick="selectRO('ro3',null);switchView('ro3',null)"><div class="stat-ic">🛒</div><div class="stat-val">${customers.filter(d=>d.ro3).length}</div><div class="stat-lbl">RO 3</div></div>

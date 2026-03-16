@@ -952,11 +952,20 @@ function renderCustomerView() {
   // Selection toolbar
   const selHTML = selectedIds.size > 0 ? `<div class="sel-toolbar">
     <span class="sel-count">${selectedIds.size} dipilih</span>
-    <button class="btn btn-sm btn-success" onclick="exportSelectedExcel()">📊 Excel Dipilih</button>
-    <button class="btn btn-sm btn-ghost" onclick="exportCSV(true)">⬇️ CSV Dipilih</button>
+    <button class="btn btn-sm btn-success" onclick="exportSelectedExcel()">📊 Excel</button>
+    <button class="btn btn-sm btn-ghost" onclick="exportCSV(true)">⬇️ CSV</button>
     <span style="width:1px;height:16px;background:var(--border)"></span>
+    <button class="btn btn-sm btn-danger" onclick="deleteSelected()">🗑️ Hapus Dipilih (${selectedIds.size})</button>
     <button class="btn btn-sm btn-ghost" onclick="selectedIds.clear();renderCustomerView()">✕ Batal</button>
-  </div>` : '';
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.15);border-radius:8px;font-size:12px;color:var(--text-muted)">
+    <span>⚠️ Hapus semua hasil filter saat ini (${filtered.length} data):</span>
+    <button class="btn btn-sm btn-danger" onclick="deleteAllFiltered()">🗑️ Hapus Semua ${filtered.length} Data</button>
+  </div>` : `
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.15);border-radius:8px;font-size:12px;color:var(--text-muted)">
+    <span>🗑️ Hapus massal:</span>
+    <button class="btn btn-sm btn-danger" onclick="deleteAllFiltered()">Hapus Semua ${filtered.length} Data (filter aktif)</button>
+  </div>`;
 
   // Table rows
   const rowsHTML = pageData.length === 0
@@ -1239,6 +1248,40 @@ async function delCustomer(id) {
   if (error) { toast('❌', 'Gagal hapus: ' + error.message); return; }
   if (detailId === id) closeDetail();
   toast('🗑️', 'Customer dihapus!');
+  await loadCustomers();
+}
+
+async function deleteSelected() {
+  const ids = [...selectedIds];
+  if (!ids.length) return;
+  if (!confirm(`Hapus ${ids.length} customer yang dipilih? Data tidak bisa dikembalikan.`)) return;
+  const { error } = await sb.from('customers').delete().in('id', ids);
+  if (error) { toast('❌', 'Gagal hapus: ' + error.message); return; }
+  selectedIds.clear();
+  toast('🗑️', `${ids.length} customer dihapus!`);
+  await loadCustomers();
+}
+
+async function deleteAllFiltered() {
+  const ids = filtered.map(d => d.id);
+  if (!ids.length) { toast('⚠️', 'Tidak ada data'); return; }
+  if (!confirm(`⚠️ HAPUS ${ids.length} customer?\n\nIni akan menghapus SEMUA data hasil filter saat ini.\nTidak bisa dikembalikan!`)) return;
+
+  // Double confirm untuk keamanan
+  const konfirm = prompt(`Ketik HAPUS untuk konfirmasi menghapus ${ids.length} data:`);
+  if (konfirm !== 'HAPUS') { toast('❌', 'Dibatalkan'); return; }
+
+  toast('⏳', 'Menghapus...');
+  // Hapus per batch 100
+  const BATCH = 100;
+  let total = 0;
+  for (let i = 0; i < ids.length; i += BATCH) {
+    const batch = ids.slice(i, i + BATCH);
+    const { error } = await sb.from('customers').delete().in('id', batch);
+    if (!error) total += batch.length;
+  }
+  selectedIds.clear();
+  toast('🗑️', `${total} customer berhasil dihapus!`);
   await loadCustomers();
 }
 

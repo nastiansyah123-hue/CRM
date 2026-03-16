@@ -1496,25 +1496,23 @@ async function doCSImport() {
   document.getElementById('csImportProgress').style.display = '';
   const progText = document.getElementById('csImportProgressText');
 
-  const BATCH = 500; // Supabase support up to 500 per insert
+  const BATCH = 1000;
+  const PARALLEL = 5;
   const allRows = csImportData.map(d => {
     const { _cs_name, _force_cs, ...clean } = d;
     return { ...clean, cs_id: currentUser.id };
   });
 
-  // Bagi jadi batch
   const batches = [];
   for (let i = 0; i < allRows.length; i += BATCH) {
     batches.push(allRows.slice(i, i + BATCH));
   }
 
   let success = 0, failed = 0;
-  // Jalankan 3 batch parallel sekaligus
-  const PARALLEL = 3;
   for (let i = 0; i < batches.length; i += PARALLEL) {
     const chunk = batches.slice(i, i + PARALLEL);
     progText.textContent = `Mengimport... ${Math.min((i+PARALLEL)*BATCH, allRows.length)} / ${allRows.length}`;
-    const results = await Promise.all(chunk.map(b => sb.from('customers').insert(b)));
+    const results = await Promise.all(chunk.map(b => sbAdmin.from('customers').insert(b)));
     results.forEach((r, j) => {
       if (r.error) { failed += chunk[j].length; console.error(r.error); }
       else success += chunk[j].length;

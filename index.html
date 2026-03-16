@@ -1866,11 +1866,34 @@ async function renderAdminCS() {
   document.getElementById('searchBoxWrap').style.display = 'none';
   document.getElementById('mainContent').innerHTML = '<div class="empty"><div class="spinner"></div></div>';
   await loadCSStats();
+
+  // Load mood hari ini semua CS
+  const { data: moods } = await sb.from('cs_mood_today').select('*');
+  const moodMap = {};
+  (moods||[]).forEach(m => { moodMap[m.cs_id] = m; });
+
+  const today = new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long'});
   const html = `
-    <div style="margin-bottom:16px;font-family:'Syne',sans-serif;font-weight:700;font-size:16px">Statistik Per CS</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px">Statistik Per CS</div>
+      <div style="font-size:12px;color:var(--text-muted)">📅 ${today}</div>
+    </div>
     <div class="cs-grid">
       ${csStats.map(cs => {
         const init = cs.cs_name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+        const mood = moodMap[cs.cs_id];
+        const moodHTML = mood
+          ? `<div style="display:flex;align-items:center;gap:6px;margin-top:10px;padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+              <span style="font-size:22px">${mood.emot}</span>
+              <div>
+                <div style="font-size:12px;font-weight:600">${mood.label}</div>
+                <div style="font-size:10px;color:var(--text-muted)">Mood hari ini</div>
+              </div>
+             </div>`
+          : `<div style="display:flex;align-items:center;gap:6px;margin-top:10px;padding:8px 10px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);opacity:.5">
+              <span style="font-size:18px">😶</span>
+              <div style="font-size:11px;color:var(--text-muted)">Belum isi mood hari ini</div>
+             </div>`;
         return `<div class="cs-card" onclick="viewCSData('${cs.cs_id}','${cs.cs_name}')">
           <div class="cs-card-head">
             <div class="cs-card-ava">${init}</div>
@@ -1879,7 +1902,8 @@ async function renderAdminCS() {
               <div class="cs-card-code">${cs.cs_code || ''} ${!cs.is_active?'<span class="inactive-badge">Nonaktif</span>':'<span class="active-badge">Aktif</span>'}</div>
             </div>
           </div>
-          <div class="cs-metrics">
+          ${moodHTML}
+          <div class="cs-metrics" style="margin-top:10px">
             <div class="cs-metric"><div class="cs-metric-val">${cs.total_customer}</div><div class="cs-metric-lbl">Customer</div></div>
             <div class="cs-metric"><div class="cs-metric-val" style="color:var(--accent4)">${cs.delivered}</div><div class="cs-metric-lbl">Delivered</div></div>
             <div class="cs-metric"><div class="cs-metric-val" style="color:var(--accent2)">${cs.crm_aktif}</div><div class="cs-metric-lbl">CRM</div></div>
@@ -2202,7 +2226,7 @@ function selectMood(el, emot, label) {
   saveBtn.textContent = `${emot} Mulai Kerja →`;
 }
 
-function saveMood() {
+async function saveMood() {
   if (!selectedMoodEmot) return;
   const uid = currentUser?.id || 'guest';
   const today = new Date().toISOString().split('T')[0];
@@ -2211,15 +2235,21 @@ function saveMood() {
   // Simpan ke localStorage
   localStorage.setItem(todayKey, JSON.stringify({ emot: selectedMoodEmot, label: selectedMoodLabel, date: today }));
 
-  // Simpan ke histori
+  // Simpan ke histori lokal
   const histKey = 'mood_history_' + uid;
   const hist = getMoodHistory(uid);
   hist.push({ emot: selectedMoodEmot, label: selectedMoodLabel, date: today });
-  // Keep max 30 hari
-  const recent = hist.slice(-30);
-  localStorage.setItem(histKey, JSON.stringify(recent));
+  localStorage.setItem(histKey, JSON.stringify(hist.slice(-30)));
 
-  // Tampilkan pesan sesuai mood
+  // Simpan ke Supabase (upsert = update kalau sudah ada hari ini)
+  await sb.from('moods').upsert({
+    cs_id: currentUser.id,
+    emot: selectedMoodEmot,
+    label: selectedMoodLabel,
+    tanggal: today
+  }, { onConflict: 'cs_id,tanggal' });
+
+  // Pesan motivasi
   const msgs = {
     '😄': 'Wah semangat banget! Ayo produktif hari ini! 💪',
     '😊': 'Semangat ya! Pasti bisa dapat banyak customer hari ini! 🌟',
@@ -2231,12 +2261,8 @@ function saveMood() {
     '🤒': 'Jaga kesehatan ya! Jangan dipaksakan kalau kurang sehat 💊',
   };
   const msg = msgs[selectedMoodEmot] || 'Semangat ya hari ini! 🌟';
-
   closeMoodModal();
-  // Tampilkan pesan motivasi
-  setTimeout(() => {
-    toast(selectedMoodEmot, msg);
-  }, 300);
+  setTimeout(() => toast(selectedMoodEmot, msg), 300);
 }
 
 function closeMoodModal() {

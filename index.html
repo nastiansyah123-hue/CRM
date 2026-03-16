@@ -167,6 +167,7 @@ td{padding:11px 13px;font-size:13px;vertical-align:middle}
 .b-pending{background:rgba(100,116,139,.12);color:var(--text-muted)}
 .b-rts{background:rgba(239,68,68,.12);color:var(--danger)}
 .b-onway{background:rgba(245,158,11,.12);color:var(--accent3)}
+.b-undell{background:rgba(168,85,247,.12);color:#a855f7}
 .b-crm{background:rgba(6,182,212,.15);color:var(--accent2)}
 .b-testi{background:rgba(245,158,11,.15);color:var(--accent3)}
 .b-manjur{background:rgba(16,185,129,.2);color:#34d399}
@@ -478,7 +479,7 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
         <div class="fg"><div class="fl">Kabupaten/Kota</div><input class="fi" id="fKab" placeholder="Kabupaten"></div>
         <div class="fg"><div class="fl">Kecamatan</div><input class="fi" id="fKec" placeholder="Kecamatan"></div>
         <div class="fg"><div class="fl">Provinsi</div><input class="fi" id="fProv" placeholder="Provinsi"></div>
-        <div class="fg"><div class="fl">Status Paket</div><select class="fs" id="fStatus"><option value="-">- (Proses)</option><option value="DELIVERED">DELIVERED</option><option value="RTS">RTS (Retur)</option></select></div>
+        <div class="fg"><div class="fl">Status Paket</div><select class="fs" id="fStatus"><option value="-">- (Proses)</option><option value="DELIVERED">DELIVERED</option><option value="RTS">RTS (Retur)</option><option value="UNDELL">UNDELL (Undelivered)</option></select></div>
         <div class="fg"><div class="fl">Usia</div><input class="fi" id="fUsia" placeholder="60 tahun"></div>
         <div class="fg"><div class="fl">Jenis Kelamin</div><select class="fs" id="fGender"><option value="">-</option><option>Laki-laki</option><option>Perempuan</option></select></div>
         <div class="fg ffull"><div class="fl">Penyakit/Keluhan</div><textarea class="ft" id="fPenyakit" placeholder="Keluhan mata..."></textarea></div>
@@ -1121,8 +1122,9 @@ function applyViewFilter(d) {
 function applyPillFilter(d) {
   if (activeFilter === 'all') return true;
   if (activeFilter === 'delivered') return d.status_paket === 'DELIVERED';
-  if (activeFilter === 'pending') return d.status_paket !== 'DELIVERED' && d.status_paket !== 'RTS';
+  if (activeFilter === 'pending') return !['DELIVERED','RTS','UNDELL'].includes(d.status_paket);
   if (activeFilter === 'rts') return d.status_paket === 'RTS';
+  if (activeFilter === 'undell') return d.status_paket === 'UNDELL';
   if (activeFilter === 'crm') return d.crm;
   if (activeFilter === 'testi') return d.info_testimoni;
   if (activeFilter === 'manjur') return d.manjur;
@@ -1230,6 +1232,7 @@ function renderCustomerView() {
         <div class="pill ${activeFilter==='delivered'?'active':''}" onclick="setPill('delivered')">✅ Delivered</div>
         <div class="pill ${activeFilter==='pending'?'active':''}" onclick="setPill('pending')">🔄 Proses</div>
         <div class="pill ${activeFilter==='rts'?'active':''}" onclick="setPill('rts')" style="background:${activeFilter==='rts'?'rgba(239,68,68,.15)':''}">↩ RTS</div>
+        <div class="pill ${activeFilter==='undell'?'active':''}" onclick="setPill('undell')">⚠️ Undell</div>
       </div>
       <div class="filter-group">
         <span class="filter-lbl">Label:</span>
@@ -1270,6 +1273,7 @@ function rowHTML(d) {
     const s = d.status_paket || '-';
     if (s === 'DELIVERED') return '<span class="badge b-delivered">✓ Delivered</span>';
     if (s === 'RTS') return '<span class="badge b-rts">↩ RTS</span>';
+    if (s === 'UNDELL') return '<span class="badge b-undell">⚠️ Undell</span>';
     if (s === 'ON THE WAY' || s === 'OTW') return '<span class="badge b-onway">🚚 OTW</span>';
     return '<span class="badge b-pending">— Proses</span>';
   })();
@@ -1753,7 +1757,8 @@ async function previewProgresFile(input) {
       const v = String(s).toLowerCase().trim();
       if (v.includes('deliv') || v === 'd') return 'DELIVERED';
       if (v.includes('rts') || v.includes('retur') || v.includes('return')) return 'RTS';
-      if (v.includes('undel') || v.includes('proses') || v === '-') return '-';
+      if (v.includes('undel') || v.includes('un del')) return 'UNDELL';
+      if (v.includes('proses') || v === '-') return '-';
       return String(s).trim().toUpperCase();
     };
 

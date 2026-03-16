@@ -466,7 +466,16 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
         <div class="fg ffull">
           <div class="fl" style="color:var(--accent3);font-weight:600;margin-bottom:8px">🛒 Repeat Order (RO)</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px">
-            ${[1,2,3,4,5,6,7,8,9,10].map(n=>`<label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px"><input type="checkbox" id="fRo${n}"> RO ${n}</label>`).join('')}
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px"><input type="checkbox" id="fRo1"> RO 1</label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px"><input type="checkbox" id="fRo2"> RO 2</label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px"><input type="checkbox" id="fRo3"> RO 3</label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px"><input type="checkbox" id="fRo4"> RO 4</label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px"><input type="checkbox" id="fRo5"> RO 5</label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px"><input type="checkbox" id="fRo6"> RO 6</label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px"><input type="checkbox" id="fRo7"> RO 7</label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px"><input type="checkbox" id="fRo8"> RO 8</label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px"><input type="checkbox" id="fRo9"> RO 9</label>
+            <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px"><input type="checkbox" id="fRo10"> RO 10</label>
           </div>
         </div>
         </div>
@@ -1420,7 +1429,8 @@ async function renderCSImport() {
           <strong>📋 Format kolom yang dikenali:</strong><br>
           NAMA, NO HP, KAB/KABUPATEN, KEC/KECAMATAN, PROV/PROVINSI,<br>
           STATUS PAKET, PENYAKIT, USIA, JENIS KELAMIN,<br>
-          CRM, LAST FU, RECALL/JEMPUT POLA, CATATAN<br><br>
+          CRM, LAST FU, RECALL/JEMPUT POLA, CATATAN<br>
+          <strong>RO 1, RO 2, RO 3, RO 4, RO 5, RO 6, RO 7, RO 8, RO 9, RO 10</strong><br><br>
           ✅ Data otomatis masuk ke akun Anda
         </div>
         <div class="fg">

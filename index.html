@@ -545,8 +545,8 @@ let page = 1, perPage = 20, sortK = 'created_at', sortA = false;
 let activeFilter = 'all', activeView = 'db', selectedIds = new Set();
 let editingId = null, detailId = null, csStats = [];
 
-// Jalankan app setelah DOM siap
-document.addEventListener('DOMContentLoaded', function() {
+// Jalankan boot setelah DOM siap
+document.addEventListener('DOMContentLoaded', () => boot());
 
 const COLORS = [
   {bg:'rgba(59,130,246,.2)',c:'#3b82f6'},{bg:'rgba(6,182,212,.2)',c:'#06b6d4'},
@@ -1545,10 +1545,8 @@ function toast(ic, msg) {
 }
 
 // ════════════════════════════════════════════
-// START
+// START — boot() dipanggil via DOMContentLoaded di atas
 // ════════════════════════════════════════════
-  boot();
-}); // end DOMContentLoaded
 </script>
 </body>
 </html>

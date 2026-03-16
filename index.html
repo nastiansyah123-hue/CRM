@@ -844,7 +844,17 @@ async function loadCustomers() {
     from += LIMIT;
   }
 
-  customers = allData.map((d, i) => ({ ...d, _ci: i % COLORS.length }));
+  // Hitung berapa kali tiap nomor HP muncul = jumlah pembelian
+  const hpCount = {};
+  allData.forEach(d => {
+    if (d.no_hp) hpCount[d.no_hp] = (hpCount[d.no_hp] || 0) + 1;
+  });
+
+  customers = allData.map((d, i) => ({
+    ...d,
+    _ci: i % COLORS.length,
+    _beli: d.no_hp ? (hpCount[d.no_hp] || 1) : 1
+  }));
   filtered = [...customers];
   updateStats();
   renderView();
@@ -1056,6 +1066,7 @@ function renderCustomerView() {
           <th onclick="doSort('kabupaten')">Kota</th>
           <th onclick="doSort('status_paket')">Status</th>
           <th>Label</th>
+          <th onclick="doSort('_beli')" title="Jumlah beli">🛒 Beli</th>
           <th onclick="doSort('jadwal_fu')">📅 Jadwal FU</th>
           <th onclick="doSort('last_fu')">Last FU</th>
           <th></th>
@@ -1134,8 +1145,13 @@ function rowHTML(d) {
     <td style="font-size:12px;color:var(--text-dim)">${d.kabupaten||'—'}</td>
     <td>${statusB}</td>
     <td>${tags.join(' ')||'<span style="color:var(--text-muted);font-size:11px">—</span>'}</td>
-    <td>${fuBadgeHTML(d)}</td>
     <td style="font-size:11px;color:var(--text-muted)">${d.last_fu||'—'}</td>
+    <td>${fuBadgeHTML(d)}</td>
+    <td style="text-align:center">
+      ${(d._beli||1) > 1
+        ? `<span style="background:rgba(245,158,11,.15);color:var(--accent3);border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700">🛒 ${d._beli}x</span>`
+        : `<span style="font-size:11px;color:var(--text-muted)">1x</span>`}
+    </td>
     <td><div class="acts" onclick="event.stopPropagation()">
       <button class="btn btn-ghost btn-icon btn-sm" onclick="openEdit(${d.id})">✏️</button>
       <button class="btn btn-danger btn-icon btn-sm" onclick="delCustomer(${d.id})">🗑️</button>
@@ -1200,6 +1216,7 @@ function openDetail(id) {
     <div class="dp-sect">
       <div class="dp-stl">Informasi</div>
       <div class="dp-row"><span class="dp-k">Status Paket</span><span class="dp-v">${d.status_paket||'—'}</span></div>
+      <div class="dp-row"><span class="dp-k">Jumlah Beli</span><span class="dp-v" style="color:${(d._beli||1)>1?'var(--accent3)':'inherit'};font-weight:700">${d._beli||1}x ${(d._beli||1)>1?'(Repeat Order)':''}</span></div>
       <div class="dp-row"><span class="dp-k">Kabupaten</span><span class="dp-v">${d.kabupaten||'—'}</span></div>
       <div class="dp-row"><span class="dp-k">Kecamatan</span><span class="dp-v">${d.kecamatan||'—'}</span></div>
       <div class="dp-row"><span class="dp-k">Provinsi</span><span class="dp-v">${d.provinsi||'—'}</span></div>
@@ -1459,19 +1476,29 @@ async function doCSImport() {
   document.getElementById('csImportProgress').style.display = '';
   const progText = document.getElementById('csImportProgressText');
 
-  let success = 0, failed = 0;
-  const BATCH = 50;
+  const BATCH = 500; // Supabase support up to 500 per insert
+  const allRows = csImportData.map(d => {
+    const { _cs_name, _force_cs, ...clean } = d;
+    return { ...clean, cs_id: currentUser.id };
+  });
 
-  for (let i = 0; i < csImportData.length; i += BATCH) {
-    const batch = csImportData.slice(i, i + BATCH);
-    progText.textContent = `Mengimport... ${Math.min(i+BATCH, csImportData.length)} / ${csImportData.length}`;
-    const rows = batch.map(d => {
-      const { _cs_name, _force_cs, ...clean } = d;
-      return { ...clean, cs_id: currentUser.id };
+  // Bagi jadi batch
+  const batches = [];
+  for (let i = 0; i < allRows.length; i += BATCH) {
+    batches.push(allRows.slice(i, i + BATCH));
+  }
+
+  let success = 0, failed = 0;
+  // Jalankan 3 batch parallel sekaligus
+  const PARALLEL = 3;
+  for (let i = 0; i < batches.length; i += PARALLEL) {
+    const chunk = batches.slice(i, i + PARALLEL);
+    progText.textContent = `Mengimport... ${Math.min((i+PARALLEL)*BATCH, allRows.length)} / ${allRows.length}`;
+    const results = await Promise.all(chunk.map(b => sb.from('customers').insert(b)));
+    results.forEach((r, j) => {
+      if (r.error) { failed += chunk[j].length; console.error(r.error); }
+      else success += chunk[j].length;
     });
-    const { error } = await sb.from('customers').insert(rows);
-    if (error) { failed += batch.length; console.error(error); }
-    else success += batch.length;
   }
 
   document.getElementById('csImportProgress').style.display = 'none';
@@ -1757,30 +1784,34 @@ async function doImport() {
   });
 
   let success = 0, failed = 0;
-  const BATCH = 50;
+  const BATCH = 500;
 
-  for (let i = 0; i < importData.length; i += BATCH) {
-    const batch = importData.slice(i, i + BATCH);
-    progText.textContent = `Mengimport... ${Math.min(i+BATCH, importData.length)} / ${importData.length}`;
+  // Siapkan semua rows dulu
+  const allRows = importData.map(d => {
+    let cs_id = d._force_cs || null;
+    if (!cs_id && d._cs_name) {
+      const key = d._cs_name.toLowerCase().replace(/^cs\s*/i,'').trim();
+      cs_id = csMap[key] || csMap[d._cs_name.toLowerCase()] || null;
+    }
+    if (!cs_id) cs_id = currentUser.id;
+    const { _cs_name, _force_cs, ...clean } = d;
+    return { ...clean, cs_id };
+  });
+
+  // Bagi jadi batch lalu jalankan 3 parallel
+  const batches = [];
+  for (let i = 0; i < allRows.length; i += BATCH) batches.push(allRows.slice(i, i + BATCH));
+
+  const PARALLEL = 3;
+  for (let i = 0; i < batches.length; i += PARALLEL) {
+    const chunk = batches.slice(i, i + PARALLEL);
+    progText.textContent = `Mengimport... ${Math.min((i+PARALLEL)*BATCH, allRows.length)} / ${allRows.length}`;
     progSub.textContent = `${success} berhasil, ${failed} gagal`;
-
-    const rows = batch.map(d => {
-      // Resolve cs_id
-      let cs_id = d._force_cs || null;
-      if (!cs_id && d._cs_name) {
-        const key = d._cs_name.toLowerCase().replace(/^cs\s*/i,'').trim();
-        cs_id = csMap[key] || csMap[d._cs_name.toLowerCase()] || null;
-      }
-      // Fallback ke user yang sedang login (admin)
-      if (!cs_id) cs_id = currentUser.id;
-
-      const { _cs_name, _force_cs, ...clean } = d;
-      return { ...clean, cs_id };
+    const results = await Promise.all(chunk.map(b => sbAdmin.from('customers').insert(b)));
+    results.forEach((r, j) => {
+      if (r.error) { failed += chunk[j].length; console.error(r.error); }
+      else success += chunk[j].length;
     });
-
-    const { error } = await sbAdmin.from('customers').insert(rows);
-    if (error) { failed += batch.length; console.error(error); }
-    else success += batch.length;
   }
 
   document.getElementById('importProgress').style.display = 'none';

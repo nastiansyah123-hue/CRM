@@ -1933,7 +1933,7 @@ async function doImport() {
   }
 
   let success = 0, failed = 0, unmatched = 0;
-  const BATCH = 500;
+  const BATCH = 1000;
 
   // Siapkan semua rows dulu
   const allRows = importData.map(d => {
@@ -1946,11 +1946,11 @@ async function doImport() {
     return { ...clean, cs_id };
   });
 
-  // Bagi jadi batch lalu jalankan 3 parallel
+  // Bagi jadi batch lalu jalankan 5 parallel
   const batches = [];
   for (let i = 0; i < allRows.length; i += BATCH) batches.push(allRows.slice(i, i + BATCH));
 
-  const PARALLEL = 3;
+  const PARALLEL = 5;
   for (let i = 0; i < batches.length; i += PARALLEL) {
     const chunk = batches.slice(i, i + PARALLEL);
     progText.textContent = `Mengimport... ${Math.min((i+PARALLEL)*BATCH, allRows.length)} / ${allRows.length}`;

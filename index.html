@@ -667,30 +667,25 @@ function initApp() {
   const lastView = (() => { try { return localStorage.getItem('crm_last_view') || 'db'; } catch(e) { return 'db'; } })();
 
   if (p?.role === 'admin_data') {
-    // Admin Data: restore ke last view, default ke update_progres
     const adminDataViews = ['update_progres','admin_import','admin_cs','db'];
     const view = adminDataViews.includes(lastView) ? lastView : 'update_progres';
     restoreView(view);
   } else {
-    // CS / Admin / SPV: restore ke last view, default ke db
     restoreView(lastView);
   }
 }
 
-// Restore view setelah browser refresh — load data dulu lalu tampilkan view yang dimaksud
+// Restore view setelah browser refresh
 async function restoreView(view) {
-  // View yang butuh data customers dulu sebelum bisa ditampilkan
-  const needsCustomers = new Set([...DB_VIEWS, 'cs_progres']);
-
-  if (needsCustomers.has(view)) {
-    // Load data dulu, lalu switch ke view yang diinginkan
+  if (DB_VIEWS.has(view)) {
+    // View database: load data dulu baru tampilkan
     await loadCustomers();
     if (view !== 'db') switchView(view, null);
   } else {
-    // View seperti admin_cs, admin_import, update_progres, admin_users — langsung tampilkan
-    // tapi tetap load customers di background untuk stats
+    // View non-database (Import, Progres Orderan, Admin CS, dll):
+    // Langsung tampilkan dulu, load data customer di background (untuk stats/badge)
     switchView(view, null);
-    loadCustomers(); // background, tidak di-await
+    loadCustomers(); // background, tidak di-await, tidak akan override view karena DB_VIEWS check
   }
 }
 

@@ -7,8 +7,32 @@
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-:root{--bg:#070b12;--surface:#0f1520;--surface2:#141d2e;--surface3:#1a2540;--border:#1e2d47;--accent:#3b82f6;--accent2:#06b6d4;--accent3:#f59e0b;--accent4:#10b981;--danger:#ef4444;--text:#e2e8f0;--text-muted:#64748b;--text-dim:#94a3b8}
+:root{--bg:#070b12;--surface:#0f1520;--surface2:#141d2e;--surface3:#1a2540;--border:#1e2d47;--accent:#3b82f6;--accent2:#06b6d4;--accent3:#f59e0b;--accent4:#10b981;--danger:#ef4444;--text:#e2e8f0;--text-muted:#64748b;--text-dim:#94a3b8;--shadow:rgba(0,0,0,.4)}
+html.light{--bg:#f0f4f8;--surface:#ffffff;--surface2:#f1f5f9;--surface3:#e2e8f0;--border:#cbd5e1;--accent:#2563eb;--accent2:#0891b2;--accent3:#d97706;--accent4:#059669;--danger:#dc2626;--text:#0f172a;--text-muted:#64748b;--text-dim:#475569;--shadow:rgba(0,0,0,.1)}
 *{box-sizing:border-box;margin:0;padding:0}
+/* THEME TOGGLE */
+.theme-toggle{display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:30px;padding:3px;gap:2px;flex-shrink:0}
+.theme-btn{display:flex;align-items:center;justify-content:center;gap:5px;padding:5px 11px;border-radius:22px;cursor:pointer;font-size:12px;font-weight:500;color:var(--text-muted);transition:all .2s;user-select:none;border:none;background:none;font-family:'DM Sans',sans-serif}
+.theme-btn.active{background:var(--surface);color:var(--text);box-shadow:0 1px 4px var(--shadow);border:1px solid var(--border)}
+html.light .theme-btn.active{background:#fff}
+/* LIGHT MODE OVERRIDES */
+html.light .sidebar{box-shadow:2px 0 8px var(--shadow)}
+html.light .topbar{box-shadow:0 1px 6px var(--shadow)}
+html.light .stat-card{box-shadow:0 1px 4px var(--shadow)}
+html.light .table-card{box-shadow:0 1px 6px var(--shadow)}
+html.light .modal{box-shadow:0 8px 32px var(--shadow)}
+html.light .detail-panel{box-shadow:-4px 0 20px var(--shadow)}
+html.light tbody tr:hover{background:#f8faff}
+html.light .nav-item.active{background:rgba(37,99,235,.1)}
+html.light .fu-item:hover{border-color:var(--accent);background:#f8faff}
+html.light .wa-template-card:hover{background:#f8faff}
+html.light .wa-template-card.selected{background:rgba(8,145,178,.05)}
+html.light .nb-dim{background:#e2e8f0;color:#475569}
+html.light .b-pending{background:rgba(100,116,139,.1);color:#475569}
+html.light .fu-none{color:#94a3b8}
+html.light .dp-penyakit{background:#f8faff}
+html.light .wa-result{background:#f8faff}
+html.light .filter-bar{box-shadow:0 1px 3px var(--shadow)}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
 .sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100}
 .logo{padding:20px 18px 16px;border-bottom:1px solid var(--border)}
@@ -272,6 +296,10 @@ tbody tr:hover .acts{opacity:1}
       <input type="text" placeholder="Cari nama, HP, kota..." id="searchInput" oninput="doSearch()">
     </div>
     <button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇️ Export</button>
+    <div class="theme-toggle">
+      <button class="theme-btn" id="btnDark" onclick="setTheme('dark')">🌙 Gelap</button>
+      <button class="theme-btn active" id="btnLight" onclick="setTheme('light')">☀️ Terang</button>
+    </div>
     <button class="btn btn-primary btn-sm" onclick="openAdd()">＋ Tambah</button>
   </div>
 
@@ -1399,7 +1427,23 @@ function toast(ic,msg){
   setTimeout(()=>t.classList.remove('show'),3000);
 }
 
+// ===== THEME =====
+function setTheme(t){
+  const html=document.documentElement;
+  if(t==='light'){ html.classList.add('light'); }
+  else { html.classList.remove('light'); }
+  document.getElementById('btnDark').classList.toggle('active',t==='dark');
+  document.getElementById('btnLight').classList.toggle('active',t==='light');
+  localStorage.setItem('crm_theme',t);
+}
+function initTheme(){
+  // Default dark
+  const saved = localStorage.getItem('crm_theme')||'dark';
+  setTheme(saved);
+}
+
 init();
+initTheme();
 </script>
 </body>
 </html>

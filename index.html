@@ -864,16 +864,28 @@ function buildSidebarNav() {
       <div class="nav-item" onclick="switchView('delivered',this)"><span class="ic">✅</span>Delivered</div>
       <div class="nav-item" onclick="switchView('testimoni',this)"><span class="ic">⭐</span>Testimoni</div>
       <div class="nav-item" onclick="switchView('loyal',this)"><span class="ic">🌟</span>Customer Loyal</div>
-      <div class="nav-item" onclick="switchView('ro1',this)"><span class="ic">🛒</span>RO 1</div>
-      <div class="nav-item" onclick="switchView('ro2',this)"><span class="ic">🛒</span>RO 2</div>
-      <div class="nav-item" onclick="switchView('ro3',this)"><span class="ic">🛒</span>RO 3</div>
-      <div class="nav-item" onclick="switchView('ro4',this)"><span class="ic">🛒</span>RO 4</div>
-      <div class="nav-item" onclick="switchView('ro5',this)"><span class="ic">🛒</span>RO 5</div>
-      <div class="nav-item" onclick="switchView('ro6',this)"><span class="ic">🛒</span>RO 6</div>
-      <div class="nav-item" onclick="switchView('ro7',this)"><span class="ic">🛒</span>RO 7</div>
-      <div class="nav-item" onclick="switchView('ro8',this)"><span class="ic">🛒</span>RO 8</div>
-      <div class="nav-item" onclick="switchView('ro9',this)"><span class="ic">🛒</span>RO 9</div>
-      <div class="nav-item" onclick="switchView('ro10',this)"><span class="ic">🛒</span>RO 10</div>
+    </div>
+    <div class="nav-sect">
+      <div class="nav-label">Repeat Order</div>
+      <div style="padding:0 8px;position:relative" id="roDdWrapper">
+        <div id="roDdTrigger" onclick="toggleRoDd()" style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:13px;user-select:none;transition:border-color .15s">
+          <span id="roDdLabel">🛒 Pilih RO</span>
+          <span id="roDdArrow" style="font-size:10px;color:var(--text-muted);transition:transform .2s">▼</span>
+        </div>
+        <div id="roDdList" style="display:none;position:fixed;width:196px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:9999;overflow-y:auto;max-height:260px;padding:4px">
+          <div class="cs-dd-item active" onclick="selectRO('',this)"><span>🛒 Semua</span></div>
+          <div class="cs-dd-item" onclick="selectRO('ro1',this)"><span>🛒 RO 1</span></div>
+          <div class="cs-dd-item" onclick="selectRO('ro2',this)"><span>🛒 RO 2</span></div>
+          <div class="cs-dd-item" onclick="selectRO('ro3',this)"><span>🛒 RO 3</span></div>
+          <div class="cs-dd-item" onclick="selectRO('ro4',this)"><span>🛒 RO 4</span></div>
+          <div class="cs-dd-item" onclick="selectRO('ro5',this)"><span>🛒 RO 5</span></div>
+          <div class="cs-dd-item" onclick="selectRO('ro6',this)"><span>🛒 RO 6</span></div>
+          <div class="cs-dd-item" onclick="selectRO('ro7',this)"><span>🛒 RO 7</span></div>
+          <div class="cs-dd-item" onclick="selectRO('ro8',this)"><span>🛒 RO 8</span></div>
+          <div class="cs-dd-item" onclick="selectRO('ro9',this)"><span>🛒 RO 9</span></div>
+          <div class="cs-dd-item" onclick="selectRO('ro10',this)"><span>🛒 RO 10</span></div>
+        </div>
+      </div>
     </div>
     ${isAdmin ? `
     <div class="nav-sect">
@@ -2259,6 +2271,43 @@ function exportSelectedExcel() {
 function toggleMobSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('overlay').classList.toggle('show');
+}
+
+// ── RO DROPDOWN ──────────────────────────────
+function toggleRoDd(){
+  const list=document.getElementById('roDdList');
+  const trigger=document.getElementById('roDdTrigger');
+  const arrow=document.getElementById('roDdArrow');
+  if(!list)return;
+  const isOpen=list.style.display!=='none';
+  if(isOpen){closeRoDd();return;}
+  const rect=trigger.getBoundingClientRect();
+  list.style.display='block';
+  list.style.top=(rect.bottom+4)+'px';
+  list.style.left=rect.left+'px';
+  list.style.width=rect.width+'px';
+  arrow.style.transform='rotate(180deg)';
+  trigger.style.borderColor='var(--accent)';
+}
+
+function closeRoDd(){
+  const list=document.getElementById('roDdList');
+  const arrow=document.getElementById('roDdArrow');
+  const trigger=document.getElementById('roDdTrigger');
+  if(!list)return;
+  list.style.display='none';
+  if(arrow)arrow.style.transform='rotate(0deg)';
+  if(trigger)trigger.style.borderColor='var(--border)';
+}
+
+function selectRO(view,el){
+  document.querySelectorAll('#roDdList .cs-dd-item').forEach(i=>i.classList.remove('active'));
+  if(el)el.classList.add('active');
+  const label=view?`🛒 ${view.replace('ro','RO ')}`:'🛒 Pilih RO';
+  document.getElementById('roDdLabel').textContent=label;
+  closeRoDd();
+  if(view)switchView(view,null);
+  else switchView('db',null);
 }
 
 // ════════════════════════════════════════════

@@ -352,7 +352,7 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
         <label class="form-label">Role</label>
         <select class="form-input" id="regRole" style="cursor:pointer">
           <option value="cs">CS (Customer Service)</option>
-          <option value="admin">Admin</option>
+          <option value="admin">SPV</option>
         </select>
       </div>
       <button class="login-btn" id="regBtn" onclick="doRegister()">✅ Buat Akun</button>
@@ -545,7 +545,7 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
         <div class="fl">Role</div>
         <select class="fs" id="csRole">
           <option value="cs">CS (Customer Service)</option>
-          <option value="admin">Admin</option>
+          <option value="admin">SPV</option>
         </select>
       </div>
       <div id="csInviteResult" style="display:none;margin-top:12px"></div>
@@ -570,7 +570,7 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
       <div class="fg"><div class="fl">Role</div>
         <select class="fs" id="editCsRole">
           <option value="cs">CS (Customer Service)</option>
-          <option value="admin">Admin</option>
+          <option value="admin">SPV</option>
         </select>
       </div>
       <input type="hidden" id="editCsId">
@@ -825,8 +825,8 @@ function initApp() {
   const initials = (p?.full_name||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
   updateAvatarUI(p?.avatar_url, initials);
   document.getElementById('userName').textContent = p?.full_name || currentUser.email;
-  document.getElementById('userRole').textContent = p?.role === 'admin' ? '👑 Admin' : '👤 Customer Service';
-  document.getElementById('sidebarSub').textContent = p?.role === 'admin' ? 'Admin Panel' : 'CS Panel';
+  document.getElementById('userRole').textContent = p?.role === 'admin' ? '👑 SPV' : '👤 Customer Service';
+  document.getElementById('sidebarSub').textContent = p?.role === 'admin' ? 'SPV Panel' : 'CS Panel';
   buildSidebarNav();
   loadCustomers();
 }
@@ -889,7 +889,7 @@ function buildSidebarNav() {
     </div>
     ${isAdmin ? `
     <div class="nav-sect">
-      <div class="nav-label">Admin</div>
+      <div class="nav-label">SPV</div>
       <div class="nav-item" onclick="switchView('admin_cs',this)"><span class="ic">👥</span>Semua CS</div>
       <div class="nav-item" onclick="switchView('admin_import',this)"><span class="ic">📥</span>Import Data</div>
       <div class="nav-item" onclick="switchView('admin_users',this)"><span class="ic">⚙️</span>Kelola Akun</div>
@@ -2083,7 +2083,7 @@ async function renderAdminUsers() {
     <!-- Admin List -->
     <div class="table-card" style="margin-top:16px">
       <div class="table-head">
-        <span class="table-ttl">👑 Daftar Admin</span>
+        <span class="table-ttl">👑 Daftar SPV</span>
         <span class="result-count">${adminUsers.length} admin</span>
       </div>
       ${adminUsers.map(u => csUserRow(u)).join('')}
@@ -2113,7 +2113,7 @@ function csUserRow(u) {
       <div style="font-weight:500;font-size:13px">${u.full_name}</div>
       <div style="font-size:11px;color:var(--text-muted);margin-top:1px;display:flex;gap:8px;flex-wrap:wrap">
         ${u.cs_code ? `<span>🔖 ${u.cs_code}</span>` : ''}
-        <span>${u.role === 'admin' ? '👑 Admin' : '👤 CS'}</span>
+        <span>${u.role === 'admin' ? '👑 SPV' : '👤 CS'}</span>
         <span>📅 Bergabung ${u.created_at ? new Date(u.created_at).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}) : '—'}</span>
       </div>
     </div>

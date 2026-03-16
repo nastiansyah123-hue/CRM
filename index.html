@@ -1737,6 +1737,16 @@ async function previewProgresFile(input) {
     const iTgl     = col(['TGL DELIVERED','TANGGAL DELIVERED','TGL DITERIMA','TANGGAL']);
     const iNama    = col(['NAMA']);
 
+    // Normalize status values
+    const normalizeStatus = (s) => {
+      if (!s) return '-';
+      const v = String(s).toLowerCase().trim();
+      if (v.includes('deliv') || v === 'd') return 'DELIVERED';
+      if (v.includes('rts') || v.includes('retur') || v.includes('return')) return 'RTS';
+      if (v.includes('undel') || v.includes('proses') || v === '-') return '-';
+      return String(s).trim().toUpperCase();
+    };
+
     progresData = [];
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
@@ -1747,8 +1757,8 @@ async function previewProgresFile(input) {
         resi,
         no_hp: hp,
         nama: iNama >= 0 ? String(r[iNama]||'').trim() : '',
-        status_paket: iStatus >= 0 ? String(r[iStatus]||'').trim().toUpperCase() : 'DELIVERED',
-        tgl_delivered: iTgl >= 0 ? parseDate(r[iTgl]) : new Date().toISOString().split('T')[0],
+        status_paket: normalizeStatus(iStatus >= 0 ? r[iStatus] : 'DELIVERED'),
+        tgl_delivered: iTgl >= 0 ? parseDate(r[iTgl]) : null,
       });
     }
 
@@ -1791,11 +1801,13 @@ async function doUpdateProgres() {
     from += 1000;
   }
 
-  // Build lookup maps
+  // Build lookup maps — skip resi yang isinya 'true' (boolean, bukan nomor resi)
   const resiMap = {};
   const hpMap = {};
   allCustomers.forEach(c => {
-    if (c.resi) resiMap[String(c.resi).trim().toLowerCase()] = c.id;
+    if (c.resi && c.resi !== 'true' && c.resi !== 'false' && c.resi.length > 4) {
+      resiMap[c.resi.trim().toLowerCase()] = c.id;
+    }
     if (c.no_hp) {
       if (!hpMap[c.no_hp]) hpMap[c.no_hp] = [];
       hpMap[c.no_hp].push(c.id);

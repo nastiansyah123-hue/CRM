@@ -463,6 +463,13 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
           <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="fZonk"> Zonk</label>
           <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="fPromo"> Promo</label>
         </div>
+        <div class="fg ffull">
+          <div class="fl" style="color:var(--accent3);font-weight:600;margin-bottom:8px">🛒 Repeat Order (RO)</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            ${[1,2,3,4,5,6,7,8,9,10].map(n=>`<label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:4px 9px"><input type="checkbox" id="fRo${n}"> RO ${n}</label>`).join('')}
+          </div>
+        </div>
+        </div>
       </div>
     </div>
     <div class="m-foot">
@@ -802,6 +809,7 @@ function buildSidebarNav() {
       <div class="nav-item" onclick="switchView('crm',this)"><span class="ic">💬</span>CRM Aktif</div>
       <div class="nav-item" onclick="switchView('delivered',this)"><span class="ic">✅</span>Delivered</div>
       <div class="nav-item" onclick="switchView('testimoni',this)"><span class="ic">⭐</span>Testimoni</div>
+      <div class="nav-item" onclick="switchView('loyal',this)"><span class="ic">🌟</span>Customer Loyal</div>
     </div>
     ${isAdmin ? `
     <div class="nav-sect">
@@ -844,17 +852,13 @@ async function loadCustomers() {
     from += LIMIT;
   }
 
-  // Hitung berapa kali tiap nomor HP muncul = jumlah pembelian
-  const hpCount = {};
-  allData.forEach(d => {
-    if (d.no_hp) hpCount[d.no_hp] = (hpCount[d.no_hp] || 0) + 1;
+  // Hitung jumlah beli dari kolom RO (ro1-ro10) + pembelian pertama
+  customers = allData.map((d, i) => {
+    const roCount = [1,2,3,4,5,6,7,8,9,10].filter(n => d['ro'+n]).length;
+    const beli = 1 + roCount; // 1 = pembelian pertama + jumlah RO
+    const loyal = roCount >= 10;
+    return { ...d, _ci: i % COLORS.length, _beli: beli, _loyal: loyal };
   });
-
-  customers = allData.map((d, i) => ({
-    ...d,
-    _ci: i % COLORS.length,
-    _beli: d.no_hp ? (hpCount[d.no_hp] || 1) : 1
-  }));
   filtered = [...customers];
   updateStats();
   renderView();
@@ -862,7 +866,9 @@ async function loadCustomers() {
 }
 
 async function loadCSStats() {
-  const { data } = await sb.from('cs_stats').select('*');
+  // cs_stats adalah view aggregate, tidak kena limit data biasa
+  // tapi tetap pakai range untuk jaga-jaga jika CS banyak
+  const { data } = await sb.from('cs_stats').select('*').limit(500);
   csStats = data || [];
 }
 
@@ -936,6 +942,7 @@ function switchView(view, navEl) {
     if (view === 'crm') return d.crm;
     if (view === 'delivered') return d.status_paket === 'DELIVERED';
     if (view === 'testimoni') return d.info_testimoni;
+  if (view === 'loyal') return d._loyal;
     return true;
   });
   page = 1;
@@ -946,7 +953,7 @@ function switchView(view, navEl) {
 function renderView() {
   const titles = {
     db:'Database Customer', fu_overdue:'🔴 FU Terlambat', fu_today:'🟡 FU Hari Ini',
-    fu_week:'🟢 FU 7 Hari', crm:'💬 CRM Aktif', delivered:'✅ Delivered', testimoni:'⭐ Testimoni'
+    fu_week:'🟢 FU 7 Hari', crm:'💬 CRM Aktif', delivered:'✅ Delivered', testimoni:'⭐ Testimoni', loyal:'🌟 Customer Loyal'
   };
   document.getElementById('topTitle').textContent = titles[activeView] || 'Database';
   document.getElementById('mobTitle').textContent = 'CRM ADSY';
@@ -1148,9 +1155,11 @@ function rowHTML(d) {
     <td style="font-size:11px;color:var(--text-muted)">${d.last_fu||'—'}</td>
     <td>${fuBadgeHTML(d)}</td>
     <td style="text-align:center">
-      ${(d._beli||1) > 1
-        ? `<span style="background:rgba(245,158,11,.15);color:var(--accent3);border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700">🛒 ${d._beli}x</span>`
-        : `<span style="font-size:11px;color:var(--text-muted)">1x</span>`}
+      ${d._loyal
+        ? `<span style="background:linear-gradient(135deg,rgba(245,158,11,.2),rgba(251,191,36,.2));color:#f59e0b;border:1px solid rgba(245,158,11,.4);border-radius:20px;padding:3px 9px;font-size:11px;font-weight:700">⭐ Loyal ${d._beli}x</span>`
+        : d._beli > 1
+          ? `<span style="background:rgba(59,130,246,.12);color:var(--accent);border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700">🛒 ${d._beli}x</span>`
+          : `<span style="font-size:11px;color:var(--text-muted)">1x</span>`}
     </td>
     <td><div class="acts" onclick="event.stopPropagation()">
       <button class="btn btn-ghost btn-icon btn-sm" onclick="openEdit(${d.id})">✏️</button>
@@ -1216,7 +1225,15 @@ function openDetail(id) {
     <div class="dp-sect">
       <div class="dp-stl">Informasi</div>
       <div class="dp-row"><span class="dp-k">Status Paket</span><span class="dp-v">${d.status_paket||'—'}</span></div>
-      <div class="dp-row"><span class="dp-k">Jumlah Beli</span><span class="dp-v" style="color:${(d._beli||1)>1?'var(--accent3)':'inherit'};font-weight:700">${d._beli||1}x ${(d._beli||1)>1?'(Repeat Order)':''}</span></div>
+      <div class="dp-row"><span class="dp-k">Jumlah Beli</span><span class="dp-v">
+        ${d._loyal ? '<span style="color:#f59e0b;font-weight:700">⭐ Customer Loyal!</span>' : ''}
+        <span style="font-weight:700;color:${d._beli>1?'var(--accent)':'inherit'}">${d._beli}x</span>
+      </span></div>
+      <div class="dp-row"><span class="dp-k">Progress RO</span>
+        <span class="dp-v" style="display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end">
+          ${[1,2,3,4,5,6,7,8,9,10].map(n=>`<span style="width:22px;height:22px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;background:${d['ro'+n]?'rgba(59,130,246,.2)':'var(--surface2)'};color:${d['ro'+n]?'var(--accent)':'var(--text-muted)'};border:1px solid ${d['ro'+n]?'var(--accent)':'var(--border)'}">${n}</span>`).join('')}
+        </span>
+      </div>
       <div class="dp-row"><span class="dp-k">Kabupaten</span><span class="dp-v">${d.kabupaten||'—'}</span></div>
       <div class="dp-row"><span class="dp-k">Kecamatan</span><span class="dp-v">${d.kecamatan||'—'}</span></div>
       <div class="dp-row"><span class="dp-k">Provinsi</span><span class="dp-v">${d.provinsi||'—'}</span></div>
@@ -1281,6 +1298,7 @@ function openEdit(id) {
   document.getElementById('fManjur').checked = !!d.manjur;
   document.getElementById('fZonk').checked = !!d.zonk;
   document.getElementById('fPromo').checked = !!d.promo;
+  for(let i=1;i<=10;i++) document.getElementById('fRo'+i).checked = !!d['ro'+i];
   document.getElementById('modalOverlay').classList.add('open');
 }
 
@@ -1289,6 +1307,7 @@ function clearForm() {
   document.getElementById('fStatus').value = '-';
   document.getElementById('fGender').value = '';
   ['fCrm','fTesti','fManjur','fZonk','fPromo'].forEach(id => document.getElementById(id).checked = false);
+  for(let i=1;i<=10;i++) document.getElementById('fRo'+i).checked = false;
 }
 
 function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
@@ -1319,6 +1338,7 @@ async function saveCustomer() {
     manjur: document.getElementById('fManjur').checked,
     zonk: document.getElementById('fZonk').checked,
     promo: document.getElementById('fPromo').checked,
+    ...Object.fromEntries([1,2,3,4,5,6,7,8,9,10].map(i=>['ro'+i, document.getElementById('fRo'+i).checked])),
     cs_id: currentUser.id,
   };
 
@@ -1697,6 +1717,8 @@ function processImportRows(rows, startRow, forceCs) {
   const iJadwalFu = col(['RECALL','JEMPUT POLA','JADWAL FU']);
   const iCatatan  = col(['CATATA','CATATAN']);
   const iTanggal  = col(['TANGGAL']);
+  // RO columns
+  const iRo = [1,2,3,4,5,6,7,8,9,10].map(n => col(['RO '+n,'RO'+n,'REPEAT ORDER '+n,'RO-'+n]));
 
   const result = [];
   for (let i = 1; i < rows.length; i++) {
@@ -1720,8 +1742,12 @@ function processImportRows(rows, startRow, forceCs) {
       last_fu: iLastFu >= 0 ? parseDate(r[iLastFu]) : null,
       jadwal_fu: iJadwalFu >= 0 ? parseDate(r[iJadwalFu]) : null,
       catatan: iCatatan >= 0 ? String(r[iCatatan]||'').trim() : '',
-      _cs_name: csName,           // untuk matching ke cs_id
-      _force_cs: forceCs || null, // cs_id langsung jika dipilih manual
+      _cs_name: csName,
+      _force_cs: forceCs || null,
+      ...Object.fromEntries([1,2,3,4,5,6,7,8,9,10].map((n,i) => {
+        const val = iRo[i] >= 0 ? r[iRo[i]] : false;
+        return ['ro'+n, val === true || String(val||'').toLowerCase() === 'true' || val === 1 || val === '1'];
+      })),
     });
   }
   return result;

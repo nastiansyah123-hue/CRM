@@ -295,16 +295,55 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
   <div class="login-card">
     <div class="login-logo">ADSY<span>CRM</span></div>
     <div class="login-sub">Customer Relationship Management</div>
-    <div class="form-group">
-      <label class="form-label">Email</label>
-      <input class="form-input" id="loginEmail" type="email" placeholder="cs@adsy.com" autocomplete="email">
+    <div id="loginForm">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" id="loginEmail" type="email" placeholder="cs@adsy.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button class="login-btn" id="loginBtn" onclick="doLogin()">Masuk</button>
+      <div class="login-error" id="loginError"></div>
+      <div style="text-align:center;margin-top:16px">
+        <span style="font-size:12px;color:var(--text-muted)">Belum punya akun? </span>
+        <span style="font-size:12px;color:var(--accent);cursor:pointer;font-weight:500" onclick="showRegister()">Buat Akun</span>
+      </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Password</label>
-      <input class="form-input" id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    <!-- REGISTER FORM -->
+    <div id="registerForm" style="display:none">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">
+        <span style="cursor:pointer;color:var(--text-muted);font-size:18px" onclick="showLogin()">←</span>
+        <span style="font-size:14px;font-weight:600">Buat Akun Baru</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nama Lengkap *</label>
+        <input class="form-input" id="regName" placeholder="CS Rina">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email *</label>
+        <input class="form-input" id="regEmail" type="email" placeholder="rina@email.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password * (min. 6 karakter)</label>
+        <input class="form-input" id="regPassword" type="password" placeholder="••••••••">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Kode CS</label>
+        <input class="form-input" id="regCode" placeholder="CS_RINA" style="text-transform:uppercase">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select class="form-input" id="regRole" style="cursor:pointer">
+          <option value="cs">CS (Customer Service)</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <button class="login-btn" id="regBtn" onclick="doRegister()">✅ Buat Akun</button>
+      <div class="login-error" id="regError"></div>
+      <div class="login-error" id="regSuccess" style="display:none;background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:var(--accent4)"></div>
     </div>
-    <button class="login-btn" id="loginBtn" onclick="doLogin()">Masuk</button>
-    <div class="login-error" id="loginError"></div>
   </div>
 </div>
 
@@ -427,7 +466,7 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
     </div>
     <div class="m-body">
       <div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--text-dim);line-height:1.6">
-        📧 CS akan mendapat <strong>email undangan</strong> dari Supabase. Mereka klik link di email → buat password sendiri → langsung bisa login.
+        ✅ Akun CS langsung aktif setelah dibuat. Admin mendapat <strong>password sementara</strong> untuk diberikan ke CS. CS bisa ganti password setelah login.
       </div>
       <div class="fg">
         <div class="fl">Nama Lengkap CS *</div>
@@ -452,7 +491,7 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
     </div>
     <div class="m-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeCSModal()">Batal</button>
-      <button class="btn btn-primary btn-sm" id="saveCsBtn" onclick="inviteCS()">📧 Kirim Undangan</button>
+      <button class="btn btn-primary btn-sm" id="saveCsBtn" onclick="inviteCS()">✅ Buat Akun CS</button>
     </div>
   </div>
 </div>
@@ -491,8 +530,18 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
 // ════════════════════════════════════════════
 const SUPABASE_URL = 'https://rudkeajhbtgtltcbzqlg.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1ZGtlYWpoYnRndGx0Y2J6cWxnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2Mzc5MDcsImV4cCI6MjA4OTIxMzkwN30.Ahn7hs8ta3UdH9Wf21hOo5QItgrVMMMjUlXWWgLj040';
+const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1ZGtlYWpoYnRndGx0Y2J6cWxnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzYzNzkwNywiZXhwIjoyMDg5MjEzOTA3fQ.69xjEPPvoES3j_PiNc6gNxwi8gtUPyOJ8ouDHHV4dU4';
 
+// Client biasa untuk login CS/Admin
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Client admin untuk buat user baru (bypass RLS)
+const sbAdmin = supabase.createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+    storageKey: 'sb-admin-client'
+  }
+});
 
 // ════════════════════════════════════════════
 // STATE
@@ -585,6 +634,81 @@ function showLoginError(msg) {
   const err = document.getElementById('loginError');
   err.textContent = msg;
   err.style.display = 'block';
+}
+
+function showRegister() {
+  document.getElementById('loginForm').style.display = 'none';
+  document.getElementById('registerForm').style.display = 'block';
+  document.getElementById('loginError').style.display = 'none';
+  document.getElementById('regError').style.display = 'none';
+  document.getElementById('regSuccess').style.display = 'none';
+}
+
+function showLogin() {
+  document.getElementById('loginForm').style.display = 'block';
+  document.getElementById('registerForm').style.display = 'none';
+}
+
+async function doRegister() {
+  const name    = document.getElementById('regName').value.trim();
+  const email   = document.getElementById('regEmail').value.trim();
+  const pass    = document.getElementById('regPassword').value;
+  const code    = document.getElementById('regCode').value.trim().toUpperCase();
+  const role    = document.getElementById('regRole').value;
+  const errEl   = document.getElementById('regError');
+  const succEl  = document.getElementById('regSuccess');
+  const btn     = document.getElementById('regBtn');
+
+  errEl.style.display = 'none';
+  succEl.style.display = 'none';
+
+  if (!name || !email || !pass) { errEl.textContent = 'Nama, email, dan password wajib diisi!'; errEl.style.display = 'block'; return; }
+  if (pass.length < 6) { errEl.textContent = 'Password minimal 6 karakter!'; errEl.style.display = 'block'; return; }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Membuat akun...';
+
+  // Buat user baru pakai sbAdmin (service_role — bypass email confirmation)
+  const { data, error } = await sbAdmin.auth.admin.createUser({
+    email,
+    password: pass,
+    email_confirm: true,   // langsung confirmed, tidak perlu klik email
+    user_metadata: { full_name: name, role, cs_code: code }
+  });
+
+  if (error) {
+    errEl.textContent = error.message === 'User already registered'
+      ? 'Email sudah terdaftar!' : 'Gagal buat akun: ' + error.message;
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = '✅ Buat Akun';
+    return;
+  }
+
+  // Update profile (trigger harusnya sudah jalan, tapi kita pastikan)
+  if (data?.user?.id) {
+    await sbAdmin.from('profiles').upsert({
+      id: data.user.id,
+      full_name: name,
+      role,
+      cs_code: code,
+      is_active: true
+    });
+  }
+
+  btn.disabled = false;
+  btn.textContent = '✅ Buat Akun';
+  succEl.textContent = `✅ Akun "${name}" berhasil dibuat! Bisa langsung login sekarang.`;
+  succEl.style.display = 'block';
+
+  // Auto-fill login form
+  setTimeout(() => {
+    showLogin();
+    document.getElementById('loginEmail').value = email;
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('loginPassword').focus();
+    toast('✅', `Akun ${name} berhasil dibuat! Silakan login.`);
+  }, 1800);
 }
 
 async function doLogout() {
@@ -1272,59 +1396,60 @@ function closeCSModal() { document.getElementById('csModalOverlay').classList.re
 function closeCSModalBg(e) { if(e.target===document.getElementById('csModalOverlay')) closeCSModal(); }
 
 async function inviteCS() {
-  const name = document.getElementById('csName').value.trim();
+  const name  = document.getElementById('csName').value.trim();
   const email = document.getElementById('csEmail').value.trim();
-  const code = document.getElementById('csCode').value.trim().toUpperCase();
-  const role = document.getElementById('csRole').value;
+  const code  = document.getElementById('csCode').value.trim().toUpperCase();
+  const role  = document.getElementById('csRole').value;
 
   if (!name || !email) { toast('⚠️', 'Nama dan email wajib diisi!'); return; }
 
   const btn = document.getElementById('saveCsBtn');
   btn.disabled = true;
-  btn.textContent = '⏳ Mengirim...';
+  btn.textContent = '⏳ Membuat akun...';
 
-  // Invite user via Supabase Auth
-  const { data, error } = await sb.auth.signInWithOtp({
+  // Buat user pakai service_role — langsung confirmed, set password sementara
+  const tempPass = 'Adsy@' + Math.random().toString(36).slice(2, 8);
+  const { data, error } = await sbAdmin.auth.admin.createUser({
     email,
-    options: {
-      shouldCreateUser: true,
-      data: { full_name: name, role, cs_code: code }
-    }
+    password: tempPass,
+    email_confirm: true,
+    user_metadata: { full_name: name, role, cs_code: code }
   });
 
   if (error) {
-    // Try admin invite approach via magic link
-    const { error: err2 } = await sb.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin
-    });
-    if (err2) {
-      toast('❌', 'Gagal kirim undangan: ' + (error.message||''));
-      btn.disabled = false;
-      btn.textContent = '📧 Kirim Undangan';
-      return;
-    }
+    toast('❌', error.message === 'User already registered' ? 'Email sudah terdaftar!' : 'Gagal: ' + error.message);
+    btn.disabled = false;
+    btn.textContent = '📧 Buat Akun';
+    return;
   }
 
-  // Manually insert profile jika belum ada (akan di-trigger otomatis tapi kita pastikan)
-  // Tampilkan instruksi manual sebagai fallback yang selalu muncul
+  // Pastikan profil tersimpan
+  if (data?.user?.id) {
+    await sbAdmin.from('profiles').upsert({
+      id: data.user.id,
+      full_name: name,
+      role,
+      cs_code: code,
+      is_active: true
+    });
+  }
+
   const resultDiv = document.getElementById('csInviteResult');
   resultDiv.style.display = 'block';
   resultDiv.innerHTML = `
     <div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:14px">
-      <div style="font-weight:600;font-size:13px;color:var(--accent4);margin-bottom:8px">✅ Undangan Terkirim!</div>
-      <div style="font-size:12px;color:var(--text-dim);line-height:1.7">
-        Email undangan dikirim ke <strong>${email}</strong><br>
-        CS perlu klik link di email untuk set password.
+      <div style="font-weight:600;font-size:13px;color:var(--accent4);margin-bottom:8px">✅ Akun Berhasil Dibuat!</div>
+      <div style="font-size:12px;color:var(--text-dim);line-height:1.8">
+        <strong>Nama:</strong> ${name}<br>
+        <strong>Email:</strong> ${email}<br>
+        <strong>Password sementara:</strong> <code style="background:var(--surface3);padding:2px 6px;border-radius:4px;font-size:12px">${tempPass}</code><br><br>
+        ⚠️ Sampaikan password ini ke CS. Minta mereka ganti password setelah login pertama.
       </div>
-      <div style="margin-top:10px;background:var(--surface2);border-radius:8px;padding:10px;font-size:11px;color:var(--text-muted)">
-        <strong>Setelah CS login pertama kali</strong>, jalankan SQL ini di Supabase untuk update profil:<br>
-        <code style="font-size:10px;word-break:break-all">UPDATE public.profiles SET full_name='${name}', role='${role}', cs_code='${code}' WHERE id=(SELECT id FROM auth.users WHERE email='${email}');</code>
-        <button onclick="copySQL('${name}','${role}','${code}','${email}')" class="btn btn-ghost btn-sm" style="margin-top:6px;width:100%">📋 Copy SQL</button>
-      </div>
+      <button onclick="navigator.clipboard.writeText('Email: ${email}\\nPassword: ${tempPass}').then(()=>toast('📋','Info login di-copy!'))" class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%">📋 Copy Info Login</button>
     </div>`;
-  btn.textContent = '✅ Terkirim';
-  toast('📧', `Undangan dikirim ke ${email}!`);
-  setTimeout(() => renderAdminUsers(), 2000);
+  btn.textContent = '✅ Selesai';
+  toast('✅', `Akun ${name} berhasil dibuat!`);
+  setTimeout(() => renderAdminUsers(), 2500);
 }
 
 function copySQL(name, role, code, email) {

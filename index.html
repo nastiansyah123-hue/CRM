@@ -864,6 +864,16 @@ function buildSidebarNav() {
       <div class="nav-item" onclick="switchView('delivered',this)"><span class="ic">✅</span>Delivered</div>
       <div class="nav-item" onclick="switchView('testimoni',this)"><span class="ic">⭐</span>Testimoni</div>
       <div class="nav-item" onclick="switchView('loyal',this)"><span class="ic">🌟</span>Customer Loyal</div>
+      <div class="nav-item" onclick="switchView('ro1',this)"><span class="ic">🛒</span>RO 1</div>
+      <div class="nav-item" onclick="switchView('ro2',this)"><span class="ic">🛒</span>RO 2</div>
+      <div class="nav-item" onclick="switchView('ro3',this)"><span class="ic">🛒</span>RO 3</div>
+      <div class="nav-item" onclick="switchView('ro4',this)"><span class="ic">🛒</span>RO 4</div>
+      <div class="nav-item" onclick="switchView('ro5',this)"><span class="ic">🛒</span>RO 5</div>
+      <div class="nav-item" onclick="switchView('ro6',this)"><span class="ic">🛒</span>RO 6</div>
+      <div class="nav-item" onclick="switchView('ro7',this)"><span class="ic">🛒</span>RO 7</div>
+      <div class="nav-item" onclick="switchView('ro8',this)"><span class="ic">🛒</span>RO 8</div>
+      <div class="nav-item" onclick="switchView('ro9',this)"><span class="ic">🛒</span>RO 9</div>
+      <div class="nav-item" onclick="switchView('ro10',this)"><span class="ic">🛒</span>RO 10</div>
     </div>
     ${isAdmin ? `
     <div class="nav-sect">
@@ -997,6 +1007,10 @@ function switchView(view, navEl) {
     if (view === 'delivered') return d.status_paket === 'DELIVERED';
     if (view === 'testimoni') return d.info_testimoni;
   if (view === 'loyal') return d._loyal;
+  // RO filters — ro1 = sudah RO 1, ro2 = sudah RO 2, dst
+  for (let i = 1; i <= 10; i++) {
+    if (view === 'ro'+i) return !!d['ro'+i];
+  }
     return true;
   });
   page = 1;
@@ -1007,7 +1021,9 @@ function switchView(view, navEl) {
 function renderView() {
   const titles = {
     db:'Database Customer', fu_overdue:'🔴 FU Terlambat', fu_today:'🟡 FU Hari Ini',
-    fu_week:'🟢 FU 7 Hari', crm:'💬 CRM Aktif', delivered:'✅ Delivered', testimoni:'⭐ Testimoni', loyal:'🌟 Customer Loyal'
+    fu_week:'🟢 FU 7 Hari', crm:'💬 CRM Aktif', delivered:'✅ Delivered', testimoni:'⭐ Testimoni', loyal:'🌟 Customer Loyal',
+    ro1:'🛒 RO 1', ro2:'🛒 RO 2', ro3:'🛒 RO 3', ro4:'🛒 RO 4', ro5:'🛒 RO 5',
+    ro6:'🛒 RO 6', ro7:'🛒 RO 7', ro8:'🛒 RO 8', ro9:'🛒 RO 9', ro10:'🛒 RO 10'
   };
   document.getElementById('topTitle').textContent = titles[activeView] || 'Database';
   document.getElementById('mobTitle').textContent = 'CRM ADSY';

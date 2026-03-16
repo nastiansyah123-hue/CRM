@@ -1018,7 +1018,11 @@ function switchView(view, navEl) {
   if (view === 'admin_cs') { renderAdminCS(); return; }
   if (view === 'admin_import') { renderAdminImport(); return; }
   if (view === 'admin_users') { renderAdminUsers(); return; }
-  if (view === 'cs_import') { renderCSImport(); return; }
+  if (view === 'cs_import') {
+    // Admin Data pakai import admin (bisa assign ke CS by NAMA CS)
+    if (currentProfile?.role === 'admin_data') { renderAdminImport(); return; }
+    renderCSImport(); return;
+  }
   // Data filter views
   filtered = customers.filter(d => {
     if (view === 'fu_overdue') return fuStatus(d) === 'overdue';

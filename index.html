@@ -1923,10 +1923,33 @@ async function viewCSData(csId, csName) {
   document.getElementById('topTitle').textContent = `👤 ${csName}`;
   document.getElementById('addBtn').style.display = '';
   document.getElementById('searchBoxWrap').style.display = '';
+  document.getElementById('exportBtn').style.display = '';
   activeView = 'db';
-  document.getElementById('mainContent').innerHTML = '<div class="empty"><div class="spinner"></div></div>';
-  const { data } = await sb.from('customers').select('*').eq('cs_id', csId).order('created_at', {ascending:false});
-  customers = (data||[]).map((d,i)=>({...d,_ci:i%COLORS.length}));
+  document.getElementById('mainContent').innerHTML = '<div class="empty"><div class="spinner"></div><div class="loading-sub" style="margin-top:12px" id="loadingText">Memuat data...</div></div>';
+
+  // Load semua data CS dengan loop (bypass limit 1000)
+  let allData = [];
+  let from = 0;
+  const LIMIT = 1000;
+  while (true) {
+    const loadTxt = document.getElementById('loadingText');
+    if (loadTxt) loadTxt.textContent = `Memuat data... ${allData.length} baris`;
+    const { data, error } = await sbAdmin.from('customers')
+      .select('*')
+      .eq('cs_id', csId)
+      .order('created_at', { ascending: false })
+      .range(from, from + LIMIT - 1);
+    if (error || !data || data.length === 0) break;
+    allData = allData.concat(data);
+    if (data.length < LIMIT) break;
+    from += LIMIT;
+  }
+
+  // Hitung RO
+  customers = allData.map((d, i) => {
+    const roCount = [1,2,3,4,5,6,7,8,9,10].filter(n => d['ro'+n]).length;
+    return { ...d, _ci: i % COLORS.length, _beli: 1 + roCount, _loyal: roCount >= 10 };
+  });
   filtered = [...customers];
   page = 1;
   renderCustomerView();

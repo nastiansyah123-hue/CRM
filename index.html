@@ -9,8 +9,6 @@
 <title>CRM ADSY</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 /* ── VARIABLES ─────────────────────────────── */
 :root{
@@ -524,9 +522,15 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
 <!-- Toast -->
 <div class="toast" id="toast"><span id="tIc">✅</span><span id="tMsg"></span></div>
 
+<!-- Library CDN — harus sebelum script app -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
 <script>
+// Semua kode dijalankan setelah CDN library selesai load
+window.addEventListener('load', function() {
 // ════════════════════════════════════════════
-// CONFIG — ganti dengan URL & KEY Supabase Anda
+// CONFIG
 // ════════════════════════════════════════════
 const SUPABASE_URL = 'https://rudkeajhbtgtltcbzqlg.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1ZGtlYWpoYnRndGx0Y2J6cWxnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2Mzc5MDcsImV4cCI6MjA4OTIxMzkwN30.Ahn7hs8ta3UdH9Wf21hOo5QItgrVMMMjUlXWWgLj040';
@@ -1560,12 +1564,8 @@ function toast(ic, msg) {
 // ════════════════════════════════════════════
 // START
 // ════════════════════════════════════════════
-// Pastikan semua library CDN sudah load sebelum boot
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', boot);
-} else {
   boot();
-}
+}); // end window.onload
 </script>
 </body>
 </html>

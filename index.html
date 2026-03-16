@@ -860,6 +860,7 @@ function buildSidebarNav() {
       <div class="nav-sect">
         <div class="nav-label">Admin Data</div>
         <div class="nav-item" onclick="switchView('admin_import',this)"><span class="ic">📥</span>Upload Data</div>
+        <div class="nav-item" onclick="switchView('update_progres',this)"><span class="ic">🚚</span>Update Progres Orderan</div>
         <div class="nav-item" onclick="switchView('admin_cs',this)"><span class="ic">👥</span>Lihat Per CS</div>
         <div class="nav-item" onclick="switchView('db',this)"><span class="ic">📋</span>Database Customer<span class="nav-badge nb-blue" id="navAll">0</span></div>
       </div>
@@ -1043,6 +1044,7 @@ function switchView(view, navEl) {
   // Special admin views
   if (view === 'admin_cs') { renderAdminCS(); return; }
   if (view === 'admin_import') { renderAdminImport(); return; }
+  if (view === 'update_progres') { renderUpdateProgres(); return; }
   if (view === 'admin_users') { renderAdminUsers(); return; }
   if (view === 'cs_import') {
     // Admin Data pakai import admin (bisa assign ke CS by NAMA CS)
@@ -1655,6 +1657,196 @@ async function doCSImport() {
 }
 
 // ════════════════════════════════════════════
+// UPDATE PROGRES ORDERAN
+// ════════════════════════════════════════════
+async function renderUpdateProgres() {
+  document.getElementById('topTitle').textContent = '🚚 Update Progres Orderan';
+  document.getElementById('addBtn').style.display = 'none';
+  document.getElementById('exportBtn').style.display = 'none';
+  document.getElementById('searchBoxWrap').style.display = 'none';
+
+  document.getElementById('mainContent').innerHTML = `
+    <div class="table-card" style="margin-bottom:16px">
+      <div class="table-head"><span class="table-ttl">🚚 Upload File Update Status Pengiriman</span></div>
+      <div style="padding:20px">
+        <div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px;color:var(--text-dim);line-height:1.9">
+          <strong>📋 Kolom yang dikenali di file Excel:</strong><br>
+          <span style="color:var(--accent)">RESI / NO RESI</span> — untuk cari data customer (utama)<br>
+          <span style="color:var(--accent)">NO HP</span> — fallback jika resi tidak ditemukan<br>
+          <span style="color:var(--accent)">STATUS PAKET</span> — nilai baru (DELIVERED / -)<br>
+          <span style="color:var(--accent)">TGL DELIVERED / TANGGAL</span> — tanggal diterima<br>
+          <span style="color:var(--accent)">NAMA</span> — untuk validasi (opsional)
+        </div>
+        <div class="fg">
+          <div class="fl">Pilih File (.xlsx atau .csv) *</div>
+          <input type="file" class="fi" id="progresFile" accept=".xlsx,.csv" onchange="previewProgresFile(this)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div id="progresPreview" style="display:none">
+      <div class="table-card">
+        <div class="table-head">
+          <span class="table-ttl" id="progresPrevTitle">Preview</span>
+          <span class="result-count" id="progresPrevCount">0 baris</span>
+          <button class="btn btn-primary btn-sm" style="margin-left:8px" onclick="doUpdateProgres()">🚚 Update Sekarang</button>
+        </div>
+        <div style="overflow-x:auto"><table><thead id="progresPrevHead"></thead><tbody id="progresPrevBody"></tbody></table></div>
+        <div style="padding:12px 16px;font-size:12px;color:var(--text-muted)">Menampilkan 10 baris pertama</div>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div id="progresProgress" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;text-align:center">
+      <div class="spinner" style="margin:0 auto 12px"></div>
+      <div style="font-weight:600;font-size:14px" id="progresProgressText">Mengupdate data...</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-top:6px" id="progresProgressSub"></div>
+    </div>
+  `;
+}
+
+let progresData = [];
+
+async function previewProgresFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  try {
+    let rows;
+    if (file.name.endsWith('.csv')) {
+      rows = parseCSV(await file.text());
+    } else {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    }
+    if (!rows.length) { toast('⚠️','File kosong'); return; }
+
+    const headers = rows[0].map(h => String(h||'').toUpperCase().trim());
+    const col = (names) => { for(const n of names){ const i=headers.findIndex(h=>h.includes(n)); if(i>=0)return i; } return -1; };
+
+    const iResi    = col(['RESI','NO RESI','NOMOR RESI','KODE RESI']);
+    const iHp      = col(['NO HP','HP','TELP','PHONE']);
+    const iStatus  = col(['STATUS PAKET','STATUS']);
+    const iTgl     = col(['TGL DELIVERED','TANGGAL DELIVERED','TGL DITERIMA','TANGGAL']);
+    const iNama    = col(['NAMA']);
+
+    progresData = [];
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      const resi = iResi >= 0 ? String(r[iResi]||'').trim() : '';
+      const hp   = iHp >= 0 ? String(r[iHp]||'').replace(/[^0-9]/g,'').substring(0,15) : '';
+      if (!resi && !hp) continue;
+      progresData.push({
+        resi,
+        no_hp: hp,
+        nama: iNama >= 0 ? String(r[iNama]||'').trim() : '',
+        status_paket: iStatus >= 0 ? String(r[iStatus]||'').trim().toUpperCase() : 'DELIVERED',
+        tgl_delivered: iTgl >= 0 ? parseDate(r[iTgl]) : new Date().toISOString().split('T')[0],
+      });
+    }
+
+    if (!progresData.length) { toast('⚠️','Tidak ada data valid'); return; }
+
+    document.getElementById('progresPreview').style.display = '';
+    document.getElementById('progresPrevTitle').textContent = `Preview: ${file.name}`;
+    document.getElementById('progresPrevCount').textContent = `${progresData.length} baris`;
+    document.getElementById('progresPrevHead').innerHTML = '<tr><th>Resi</th><th>No HP</th><th>Nama</th><th>Status</th><th>Tgl Delivered</th></tr>';
+    document.getElementById('progresPrevBody').innerHTML = progresData.slice(0,10).map(d=>
+      `<tr>
+        <td style="font-size:12px">${d.resi||'—'}</td>
+        <td style="font-size:12px">${d.no_hp||'—'}</td>
+        <td style="font-size:12px">${d.nama||'—'}</td>
+        <td style="font-size:12px"><span class="badge ${d.status_paket==='DELIVERED'?'b-delivered':'b-pending'}">${d.status_paket}</span></td>
+        <td style="font-size:12px">${d.tgl_delivered||'—'}</td>
+      </tr>`
+    ).join('');
+    toast('✅', `${progresData.length} baris siap diupdate!`);
+  } catch(e) {
+    toast('❌', 'Gagal baca file: ' + e.message);
+  }
+}
+
+async function doUpdateProgres() {
+  if (!progresData.length) { toast('⚠️','Tidak ada data'); return; }
+  document.getElementById('progresPreview').style.display = 'none';
+  document.getElementById('progresProgress').style.display = '';
+  const progText = document.getElementById('progresProgressText');
+  const progSub  = document.getElementById('progresProgressSub');
+
+  // Load semua customer (resi dan no_hp) untuk matching
+  progText.textContent = 'Memuat data customer...';
+  let allCustomers = [], from = 0;
+  while (true) {
+    const { data } = await sbAdmin.from('customers').select('id,resi,no_hp,nama,status_paket').range(from, from+999);
+    if (!data || !data.length) break;
+    allCustomers = allCustomers.concat(data);
+    if (data.length < 1000) break;
+    from += 1000;
+  }
+
+  // Build lookup maps
+  const resiMap = {};
+  const hpMap = {};
+  allCustomers.forEach(c => {
+    if (c.resi) resiMap[String(c.resi).trim().toLowerCase()] = c.id;
+    if (c.no_hp) {
+      if (!hpMap[c.no_hp]) hpMap[c.no_hp] = [];
+      hpMap[c.no_hp].push(c.id);
+    }
+  });
+
+  let updated = 0, notFound = 0, skipped = 0;
+
+  for (let i = 0; i < progresData.length; i++) {
+    const d = progresData[i];
+    progText.textContent = `Mengupdate... ${i+1} / ${progresData.length}`;
+    progSub.textContent = `✅ ${updated} diupdate • ❓ ${notFound} tidak ditemukan`;
+
+    let targetIds = [];
+
+    // 1. Match by resi
+    if (d.resi) {
+      const id = resiMap[d.resi.toLowerCase()];
+      if (id) targetIds = [id];
+    }
+    // 2. Fallback by HP
+    if (!targetIds.length && d.no_hp) {
+      targetIds = hpMap[d.no_hp] || [];
+    }
+
+    if (!targetIds.length) { notFound++; continue; }
+
+    // Update semua yang cocok
+    const updateData = { status_paket: d.status_paket };
+    if (d.tgl_delivered) updateData.tanggal = d.tgl_delivered;
+
+    const { error } = await sbAdmin.from('customers')
+      .update(updateData)
+      .in('id', targetIds);
+
+    if (error) { skipped++; } else { updated += targetIds.length; }
+  }
+
+  document.getElementById('progresProgress').style.display = 'none';
+  document.getElementById('mainContent').innerHTML += `
+    <div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:12px;padding:24px;text-align:center;margin-top:16px">
+      <div style="font-size:36px;margin-bottom:12px">✅</div>
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:18px;margin-bottom:10px">Update Selesai!</div>
+      <div style="display:flex;justify-content:center;gap:20px;font-size:14px">
+        <div><div style="font-weight:700;font-size:24px;color:var(--accent4)">${updated}</div><div style="color:var(--text-muted)">Diupdate</div></div>
+        <div><div style="font-weight:700;font-size:24px;color:var(--accent3)">${notFound}</div><div style="color:var(--text-muted)">Tidak Ditemukan</div></div>
+        <div><div style="font-weight:700;font-size:24px;color:var(--danger)">${skipped}</div><div style="color:var(--text-muted)">Gagal</div></div>
+      </div>
+      ${notFound > 0 ? `<div style="margin-top:12px;font-size:12px;color:var(--text-muted)">⚠️ ${notFound} data tidak ditemukan — pastikan nomor resi atau HP sesuai dengan database</div>` : ''}
+      <button class="btn btn-primary" style="margin-top:16px" onclick="switchView('db',null);loadCustomers()">Lihat Database →</button>
+    </div>`;
+  progresData = [];
+  toast('✅', `${updated} customer berhasil diupdate!`);
+}
+
+// ════════════════════════════════════════════
 // IMPORT DATA (Google Sheets / Excel / CSV)
 // ════════════════════════════════════════════
 async function renderAdminImport() {
@@ -1837,6 +2029,7 @@ function processImportRows(rows, startRow, forceCs) {
   const iJadwalFu = col(['RECALL','JEMPUT POLA','JADWAL FU']);
   const iCatatan  = col(['CATATA','CATATAN']);
   const iTanggal  = col(['TANGGAL']);
+  const iResi     = col(['RESI','NO RESI','KODE RESI','NOMOR RESI']);
   // RO columns
   const iRo = [1,2,3,4,5,6,7,8,9,10].map(n => col(['RO '+n,'RO'+n,'REPEAT ORDER '+n,'RO-'+n]));
 
@@ -1862,6 +2055,7 @@ function processImportRows(rows, startRow, forceCs) {
       last_fu: iLastFu >= 0 ? parseDate(r[iLastFu]) : null,
       jadwal_fu: iJadwalFu >= 0 ? parseDate(r[iJadwalFu]) : null,
       catatan: iCatatan >= 0 ? String(r[iCatatan]||'').trim() : '',
+      resi: iResi >= 0 ? String(r[iResi]||'').trim() : '',
       _cs_name: csName,
       _force_cs: forceCs || null,
       ...Object.fromEntries([1,2,3,4,5,6,7,8,9,10].map((n,i) => {

@@ -1896,24 +1896,52 @@ async function doImport() {
   // Load CS profiles untuk matching nama CS
   const { data: profiles } = await sb.from('profiles').select('id,full_name,cs_code').eq('role','cs');
   const csMap = {};
-  (profiles||[]).forEach(p => {
-    const key = (p.full_name||'').toLowerCase().replace(/^cs\s*/i,'').trim();
-    csMap[key] = p.id;
-    if (p.cs_code) csMap[p.cs_code.toLowerCase()] = p.id;
-    csMap[p.full_name.toLowerCase()] = p.id;
+  const csProfiles = profiles || [];
+
+  csProfiles.forEach(p => {
+    const name = p.full_name || '';
+    // Simpan berbagai variasi key
+    csMap[name.toLowerCase()] = p.id;                                          // "crm alam"
+    csMap[name.toLowerCase().replace(/\s+/g,'')] = p.id;                       // "crmalam"
+    csMap[name.toLowerCase().replace(/^(cs|crm)\s*/i,'').trim()] = p.id;       // "alam"
+    if (p.cs_code) {
+      csMap[p.cs_code.toLowerCase()] = p.id;                                   // "crm_alam"
+      csMap[p.cs_code.toLowerCase().replace(/[_\s]/g,'')] = p.id;             // "crmalam"
+    }
   });
 
-  let success = 0, failed = 0;
+  // Fuzzy match function — cari profil yang paling cocok
+  function findCS(nameFromExcel) {
+    if (!nameFromExcel) return null;
+    const q = nameFromExcel.toLowerCase().trim();
+
+    // 1. Exact match
+    if (csMap[q]) return csMap[q];
+    // 2. Tanpa spasi
+    if (csMap[q.replace(/\s+/g,'')]) return csMap[q.replace(/\s+/g,'')];
+    // 3. Strip prefix CS/CRM
+    const stripped = q.replace(/^(cs|crm)\s*/i,'').trim();
+    if (csMap[stripped]) return csMap[stripped];
+    // 4. Partial match — cari yang mengandung kata kunci
+    for (const p of csProfiles) {
+      const pName = (p.full_name||'').toLowerCase();
+      if (pName.includes(stripped) || stripped.includes(pName.replace(/^(cs|crm)\s*/i,'').trim())) {
+        return p.id;
+      }
+    }
+    return null;
+  }
+
+  let success = 0, failed = 0, unmatched = 0;
   const BATCH = 500;
 
   // Siapkan semua rows dulu
   const allRows = importData.map(d => {
     let cs_id = d._force_cs || null;
     if (!cs_id && d._cs_name) {
-      const key = d._cs_name.toLowerCase().replace(/^cs\s*/i,'').trim();
-      cs_id = csMap[key] || csMap[d._cs_name.toLowerCase()] || null;
+      cs_id = findCS(d._cs_name);
     }
-    if (!cs_id) cs_id = currentUser.id;
+    if (!cs_id) { unmatched++; cs_id = currentUser.id; } // fallback ke uploader
     const { _cs_name, _force_cs, ...clean } = d;
     return { ...clean, cs_id };
   });
@@ -1939,7 +1967,7 @@ async function doImport() {
     <div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:12px;padding:24px;text-align:center">
       <div style="font-size:36px;margin-bottom:12px">✅</div>
       <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:18px;margin-bottom:6px">Import Selesai!</div>
-      <div style="font-size:14px;color:var(--text-muted)">${success} data berhasil • ${failed} gagal</div>
+      <div style="font-size:14px;color:var(--text-muted)">${success} data berhasil • ${failed} gagal ${unmatched>0?'• ⚠️ '+unmatched+' nama CS tidak cocok (cek kolom NAMA CS)':''}</div>
       <button class="btn btn-primary" style="margin-top:16px" onclick="switchView('db',null)">Lihat Database →</button>
     </div>`;
   importData = [];

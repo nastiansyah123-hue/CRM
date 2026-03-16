@@ -1069,7 +1069,7 @@ function switchView(view, navEl) {
     if (currentProfile?.role === 'admin_data') { renderAdminImport(); return; }
     renderCSImport(); return;
   }
-  if (view === 'cs_progres') { renderUpdateProgres(); return; }
+  if (view === 'cs_progres') { renderProgresOrderan(); return; }
   // Data filter views
   filtered = customers.filter(d => {
     if (view === 'fu_overdue') return fuStatus(d) === 'overdue';
@@ -1096,7 +1096,7 @@ function switchView(view, navEl) {
 function renderView() {
   const titles = {
     db:'Database Customer', fu_overdue:'🔴 FU Terlambat', fu_today:'🟡 FU Hari Ini',
-    fu_week:'🟢 FU 7 Hari', fu_resi:'📦 FU Resi', fu_edukasi:'📚 FU Edukasi', fu_promo:'🎁 FU Promo',
+    fu_week:'🟢 FU 7 Hari', fu_resi:'📦 FU Resi', fu_edukasi:'📚 FU Edukasi', fu_promo:'🎁 FU Promo', cs_progres:'🚚 Progres Orderan',
     crm:'💬 CRM Aktif', delivered:'✅ Delivered', testimoni:'⭐ Testimoni', loyal:'🌟 Customer Loyal',
     ro1:'🛒 RO 1', ro2:'🛒 RO 2', ro3:'🛒 RO 3', ro4:'🛒 RO 4', ro5:'🛒 RO 5',
     ro6:'🛒 RO 6', ro7:'🛒 RO 7', ro8:'🛒 RO 8', ro9:'🛒 RO 9', ro10:'🛒 RO 10'
@@ -1692,7 +1692,80 @@ async function doCSImport() {
 }
 
 // ════════════════════════════════════════════
-// UPDATE PROGRES ORDERAN
+// PROGRES ORDERAN — Dashboard Status Pengiriman
+// ════════════════════════════════════════════
+function renderProgresOrderan() {
+  document.getElementById('topTitle').textContent = '🚚 Progres Orderan';
+  document.getElementById('addBtn').style.display = 'none';
+  document.getElementById('exportBtn').style.display = 'none';
+  document.getElementById('searchBoxWrap').style.display = 'none';
+
+  const total     = customers.length;
+  const delivered = customers.filter(d => d.status_paket === 'DELIVERED').length;
+  const rts       = customers.filter(d => d.status_paket === 'RTS').length;
+  const undell    = customers.filter(d => d.status_paket === 'UNDELL').length;
+  const proses    = customers.filter(d => !['DELIVERED','RTS','UNDELL'].includes(d.status_paket)).length;
+
+  const pct = (n) => total ? Math.round(n/total*100) : 0;
+
+  document.getElementById('mainContent').innerHTML = `
+    <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;margin-bottom:16px">📊 Ringkasan Status Pengiriman</div>
+
+    <!-- Stat cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px">
+      <div onclick="setPill('all');switchView('db',null)" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-size:28px;margin-bottom:6px">📦</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:28px">${total}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Total Orderan</div>
+      </div>
+      <div onclick="setPill('delivered');switchView('db',null)" style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#10b981'" onmouseout="this.style.borderColor='rgba(16,185,129,.25)'">
+        <div style="font-size:28px;margin-bottom:6px">✅</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:28px;color:#10b981">${delivered}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Delivered <span style="color:#10b981;font-weight:600">${pct(delivered)}%</span></div>
+        <div style="margin-top:8px;height:4px;background:var(--surface2);border-radius:2px"><div style="height:100%;width:${pct(delivered)}%;background:#10b981;border-radius:2px"></div></div>
+      </div>
+      <div onclick="setPill('pending');switchView('db',null)" style="background:rgba(100,116,139,.06);border:1px solid var(--border);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="font-size:28px;margin-bottom:6px">🔄</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:28px;color:var(--text-dim)">${proses}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">On Proses <span style="font-weight:600">${pct(proses)}%</span></div>
+        <div style="margin-top:8px;height:4px;background:var(--surface2);border-radius:2px"><div style="height:100%;width:${pct(proses)}%;background:var(--text-muted);border-radius:2px"></div></div>
+      </div>
+      <div onclick="setPill('undell');switchView('db',null)" style="background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='#a855f7'" onmouseout="this.style.borderColor='rgba(168,85,247,.2)'">
+        <div style="font-size:28px;margin-bottom:6px">⚠️</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:28px;color:#a855f7">${undell}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Undell <span style="color:#a855f7;font-weight:600">${pct(undell)}%</span></div>
+        <div style="margin-top:8px;height:4px;background:var(--surface2);border-radius:2px"><div style="height:100%;width:${pct(undell)}%;background:#a855f7;border-radius:2px"></div></div>
+      </div>
+      <div onclick="setPill('rts');switchView('db',null)" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--danger)'" onmouseout="this.style.borderColor='rgba(239,68,68,.2)'">
+        <div style="font-size:28px;margin-bottom:6px">↩️</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:28px;color:var(--danger)">${rts}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">RTS <span style="color:var(--danger);font-weight:600">${pct(rts)}%</span></div>
+        <div style="margin-top:8px;height:4px;background:var(--surface2);border-radius:2px"><div style="height:100%;width:${pct(rts)}%;background:var(--danger);border-radius:2px"></div></div>
+      </div>
+    </div>
+
+    <!-- Progress bar total -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px">
+      <div style="font-weight:600;font-size:13px;margin-bottom:12px">Distribusi Status</div>
+      <div style="height:16px;border-radius:8px;overflow:hidden;display:flex;gap:2px">
+        <div style="width:${pct(delivered)}%;background:#10b981;transition:width .5s" title="Delivered ${pct(delivered)}%"></div>
+        <div style="width:${pct(proses)}%;background:var(--text-muted);transition:width .5s" title="Proses ${pct(proses)}%"></div>
+        <div style="width:${pct(undell)}%;background:#a855f7;transition:width .5s" title="Undell ${pct(undell)}%"></div>
+        <div style="width:${pct(rts)}%;background:var(--danger);transition:width .5s" title="RTS ${pct(rts)}%"></div>
+      </div>
+      <div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;font-size:12px">
+        <span><span style="color:#10b981">●</span> Delivered ${pct(delivered)}%</span>
+        <span><span style="color:var(--text-muted)">●</span> Proses ${pct(proses)}%</span>
+        <span><span style="color:#a855f7">●</span> Undell ${pct(undell)}%</span>
+        <span><span style="color:var(--danger)">●</span> RTS ${pct(rts)}%</span>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);text-align:center">Klik kartu untuk filter data</div>
+  `;
+}
+
+// ════════════════════════════════════════════
+// UPDATE PROGRES ORDERAN (Admin Data)
 // ════════════════════════════════════════════
 async function renderUpdateProgres() {
   document.getElementById('topTitle').textContent = '🚚 Update Progres Orderan';

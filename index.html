@@ -593,6 +593,11 @@ function showLogin() {
   document.getElementById('loadingScreen').style.display = 'none';
   document.getElementById('loginPage').classList.add('show');
   document.getElementById('appShell').classList.remove('show');
+  // Reset ke form login (bukan register)
+  const lf = document.getElementById('loginForm');
+  const rf = document.getElementById('registerForm');
+  if (lf) lf.style.display = 'block';
+  if (rf) rf.style.display = 'none';
 }
 
 function showApp() {
@@ -636,7 +641,7 @@ function showRegister() {
   document.getElementById('regSuccess').style.display = 'none';
 }
 
-function showLogin() {
+function showLoginForm() {
   document.getElementById('loginForm').style.display = 'block';
   document.getElementById('registerForm').style.display = 'none';
 }

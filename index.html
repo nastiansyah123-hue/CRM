@@ -165,6 +165,8 @@ td{padding:11px 13px;font-size:13px;vertical-align:middle}
 .badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:600}
 .b-delivered{background:rgba(16,185,129,.15);color:var(--accent4)}
 .b-pending{background:rgba(100,116,139,.12);color:var(--text-muted)}
+.b-rts{background:rgba(239,68,68,.12);color:var(--danger)}
+.b-onway{background:rgba(245,158,11,.12);color:var(--accent3)}
 .b-crm{background:rgba(6,182,212,.15);color:var(--accent2)}
 .b-testi{background:rgba(245,158,11,.15);color:var(--accent3)}
 .b-manjur{background:rgba(16,185,129,.2);color:#34d399}
@@ -476,7 +478,7 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
         <div class="fg"><div class="fl">Kabupaten/Kota</div><input class="fi" id="fKab" placeholder="Kabupaten"></div>
         <div class="fg"><div class="fl">Kecamatan</div><input class="fi" id="fKec" placeholder="Kecamatan"></div>
         <div class="fg"><div class="fl">Provinsi</div><input class="fi" id="fProv" placeholder="Provinsi"></div>
-        <div class="fg"><div class="fl">Status Paket</div><select class="fs" id="fStatus"><option value="-">- (Proses)</option><option value="DELIVERED">DELIVERED</option></select></div>
+        <div class="fg"><div class="fl">Status Paket</div><select class="fs" id="fStatus"><option value="-">- (Proses)</option><option value="DELIVERED">DELIVERED</option><option value="RTS">RTS (Retur)</option></select></div>
         <div class="fg"><div class="fl">Usia</div><input class="fi" id="fUsia" placeholder="60 tahun"></div>
         <div class="fg"><div class="fl">Jenis Kelamin</div><select class="fs" id="fGender"><option value="">-</option><option>Laki-laki</option><option>Perempuan</option></select></div>
         <div class="fg ffull"><div class="fl">Penyakit/Keluhan</div><textarea class="ft" id="fPenyakit" placeholder="Keluhan mata..."></textarea></div>
@@ -1119,7 +1121,8 @@ function applyViewFilter(d) {
 function applyPillFilter(d) {
   if (activeFilter === 'all') return true;
   if (activeFilter === 'delivered') return d.status_paket === 'DELIVERED';
-  if (activeFilter === 'pending') return d.status_paket !== 'DELIVERED';
+  if (activeFilter === 'pending') return d.status_paket !== 'DELIVERED' && d.status_paket !== 'RTS';
+  if (activeFilter === 'rts') return d.status_paket === 'RTS';
   if (activeFilter === 'crm') return d.crm;
   if (activeFilter === 'testi') return d.info_testimoni;
   if (activeFilter === 'manjur') return d.manjur;
@@ -1226,6 +1229,7 @@ function renderCustomerView() {
         <div class="pill ${activeFilter==='all'?'active':''}" onclick="setPill('all')">Semua</div>
         <div class="pill ${activeFilter==='delivered'?'active':''}" onclick="setPill('delivered')">✅ Delivered</div>
         <div class="pill ${activeFilter==='pending'?'active':''}" onclick="setPill('pending')">🔄 Proses</div>
+        <div class="pill ${activeFilter==='rts'?'active':''}" onclick="setPill('rts')" style="background:${activeFilter==='rts'?'rgba(239,68,68,.15)':''}">↩ RTS</div>
       </div>
       <div class="filter-group">
         <span class="filter-lbl">Label:</span>
@@ -1262,7 +1266,13 @@ function renderCustomerView() {
 function rowHTML(d) {
   const col = COLORS[d._ci || 0];
   const init = (d.nama||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-  const statusB = d.status_paket==='DELIVERED'?'<span class="badge b-delivered">✓ Delivered</span>':'<span class="badge b-pending">— Proses</span>';
+  const statusB = (() => {
+    const s = d.status_paket || '-';
+    if (s === 'DELIVERED') return '<span class="badge b-delivered">✓ Delivered</span>';
+    if (s === 'RTS') return '<span class="badge b-rts">↩ RTS</span>';
+    if (s === 'ON THE WAY' || s === 'OTW') return '<span class="badge b-onway">🚚 OTW</span>';
+    return '<span class="badge b-pending">— Proses</span>';
+  })();
   const tags = [];
   if(d.crm) tags.push('<span class="badge b-crm">CRM</span>');
   if(d.info_testimoni) tags.push('<span class="badge b-testi">⭐</span>');
@@ -1816,34 +1826,42 @@ async function doUpdateProgres() {
 
   let updated = 0, notFound = 0, skipped = 0;
 
-  for (let i = 0; i < progresData.length; i++) {
-    const d = progresData[i];
-    progText.textContent = `Mengupdate... ${i+1} / ${progresData.length}`;
-    progSub.textContent = `✅ ${updated} diupdate • ❓ ${notFound} tidak ditemukan`;
+  // Group by status untuk batch update
+  const toUpdate = {}; // status -> [ids]
 
+  for (const d of progresData) {
     let targetIds = [];
-
-    // 1. Match by resi
     if (d.resi) {
       const id = resiMap[d.resi.toLowerCase()];
       if (id) targetIds = [id];
     }
-    // 2. Fallback by HP
     if (!targetIds.length && d.no_hp) {
       targetIds = hpMap[d.no_hp] || [];
     }
-
     if (!targetIds.length) { notFound++; continue; }
 
-    // Update semua yang cocok
-    const updateData = { status_paket: d.status_paket };
-    if (d.tgl_delivered) updateData.tanggal = d.tgl_delivered;
+    const key = d.status_paket;
+    if (!toUpdate[key]) toUpdate[key] = [];
+    toUpdate[key].push(...targetIds);
+  }
 
-    const { error } = await sbAdmin.from('customers')
-      .update(updateData)
-      .in('id', targetIds);
+  // Batch update per status — jalankan parallel
+  const statusList = Object.keys(toUpdate);
+  progText.textContent = `Mengupdate ${progresData.length} data...`;
+  progSub.textContent = `${notFound} tidak ditemukan`;
 
-    if (error) { skipped++; } else { updated += targetIds.length; }
+  const BATCH = 500;
+  for (const status of statusList) {
+    const ids = toUpdate[status];
+    for (let i = 0; i < ids.length; i += BATCH) {
+      const batch = ids.slice(i, i + BATCH);
+      const { error } = await sbAdmin.from('customers')
+        .update({ status_paket: status })
+        .in('id', batch);
+      if (error) { skipped += batch.length; }
+      else { updated += batch.length; }
+      progText.textContent = `Mengupdate... ${updated} / ${ids.length + notFound}`;
+    }
   }
 
   document.getElementById('progresProgress').style.display = 'none';

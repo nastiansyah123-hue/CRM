@@ -1893,8 +1893,8 @@ async function doImport() {
   const progText = document.getElementById('importProgressText');
   const progSub = document.getElementById('importProgressSub');
 
-  // Load CS profiles untuk matching nama CS
-  const { data: profiles } = await sb.from('profiles').select('id,full_name,cs_code').eq('role','cs');
+  // Load CS profiles pakai sbAdmin agar tidak kena RLS
+  const { data: profiles } = await sbAdmin.from('profiles').select('id,full_name,cs_code').eq('role','cs');
   const csMap = {};
   const csProfiles = profiles || [];
 

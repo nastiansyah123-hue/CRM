@@ -74,7 +74,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .nb-orange{background:var(--accent3);color:#000}
 .nb-green{background:var(--accent4);color:#fff}
 .nb-dim{background:var(--surface3);color:var(--text-muted)}
-.sidebar-foot{padding:12px;border-top:1px solid var(--border)}
+.sidebar-foot{padding:12px;border-top:1px solid var(--border);position:relative}
 .user-card{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;background:var(--surface2)}
 .user-ava{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:700;font-size:12px;color:#fff;flex-shrink:0;background-size:cover;background-position:center;overflow:hidden}
 .user-name{font-size:12px;font-weight:500}
@@ -385,18 +385,44 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
       <!-- populated by JS based on role -->
     </nav>
     <div class="sidebar-foot">
-      <div class="user-card">
-        <div style="position:relative;flex-shrink:0;cursor:pointer" onclick="openAvatarUpload()" title="Ganti foto profil">
+      <div class="user-card" onclick="toggleProfileMenu()" style="cursor:pointer" title="Edit Profil">
+        <div style="position:relative;flex-shrink:0">
           <div class="user-ava" id="userAva">?</div>
-          <div style="position:absolute;bottom:-2px;right:-2px;width:14px;height:14px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;border:2px solid var(--surface2)">📷</div>
         </div>
         <div style="flex:1;min-width:0">
           <div class="user-name" id="userName">–</div>
           <div class="user-role" id="userRole">–</div>
         </div>
-        <span class="logout-btn" onclick="doLogout()" title="Keluar">⏻</span>
+        <span style="color:var(--text-muted);font-size:11px">✏️</span>
       </div>
       <input type="file" id="avatarInput" accept="image/*" style="display:none" onchange="uploadAvatar(this)">
+      <!-- Profile menu popup -->
+      <div id="profileMenu" style="display:none;position:absolute;bottom:70px;left:12px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 8px 24px var(--shadow);z-index:200;animation:slideUp .15s ease">
+        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:13px;margin-bottom:12px">✏️ Edit Profil</div>
+        <!-- Avatar preview + upload -->
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <div id="profileAvaPreview" style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:700;font-size:18px;color:#fff;cursor:pointer;flex-shrink:0;background-size:cover;background-position:center;overflow:hidden;border:2px solid var(--border)" onclick="document.getElementById('avatarInput').click()" title="Ganti foto">?</div>
+          <div>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('avatarInput').click()">📷 Ganti Foto</button>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:4px">Max 2MB, JPG/PNG</div>
+          </div>
+        </div>
+        <!-- Edit nama -->
+        <div class="fg" style="margin-bottom:10px">
+          <div class="fl">Nama Lengkap</div>
+          <input class="fi" id="profileName" style="font-size:13px;padding:7px 10px">
+        </div>
+        <!-- Edit kode CS -->
+        <div class="fg" style="margin-bottom:14px">
+          <div class="fl">Kode CS</div>
+          <input class="fi" id="profileCode" style="font-size:13px;padding:7px 10px;text-transform:uppercase">
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary btn-sm" style="flex:1" onclick="saveProfile()">💾 Simpan</button>
+          <button class="btn btn-danger btn-sm" onclick="doLogout()">⏻ Keluar</button>
+          <button class="btn btn-ghost btn-sm" onclick="closeProfileMenu()">✕</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -797,19 +823,29 @@ async function doLogout() {
 function initApp() {
   const p = currentProfile;
   const initials = (p?.full_name||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-  const avaEl = document.getElementById('userAva');
-  if (p?.avatar_url) {
-    avaEl.style.backgroundImage = `url(${p.avatar_url})`;
-    avaEl.textContent = '';
-  } else {
-    avaEl.style.backgroundImage = '';
-    avaEl.textContent = initials;
-  }
+  updateAvatarUI(p?.avatar_url, initials);
   document.getElementById('userName').textContent = p?.full_name || currentUser.email;
   document.getElementById('userRole').textContent = p?.role === 'admin' ? '👑 Admin' : '👤 Customer Service';
   document.getElementById('sidebarSub').textContent = p?.role === 'admin' ? 'Admin Panel' : 'CS Panel';
   buildSidebarNav();
   loadCustomers();
+}
+
+function updateAvatarUI(avatarUrl, initials) {
+  const els = ['userAva', 'profileAvaPreview'];
+  els.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (avatarUrl) {
+      el.style.backgroundImage = `url(${avatarUrl})`;
+      el.style.background = `url(${avatarUrl}) center/cover`;
+      el.textContent = '';
+    } else {
+      el.style.backgroundImage = '';
+      el.style.background = 'linear-gradient(135deg,var(--accent),var(--accent2))';
+      el.textContent = initials || '?';
+    }
+  });
 }
 
 function buildSidebarNav() {
@@ -2211,6 +2247,50 @@ function toggleMobSidebar() {
 }
 
 // ════════════════════════════════════════════
+// PROFILE MENU
+// ════════════════════════════════════════════
+function toggleProfileMenu() {
+  const menu = document.getElementById('profileMenu');
+  const isOpen = menu.style.display !== 'none';
+  if (isOpen) { closeProfileMenu(); return; }
+  // Populate fields
+  document.getElementById('profileName').value = currentProfile?.full_name || '';
+  document.getElementById('profileCode').value = currentProfile?.cs_code || '';
+  menu.style.display = 'block';
+  // Close when clicking outside
+  setTimeout(() => document.addEventListener('click', closeProfileOnOutside), 100);
+}
+
+function closeProfileMenu() {
+  document.getElementById('profileMenu').style.display = 'none';
+  document.removeEventListener('click', closeProfileOnOutside);
+}
+
+function closeProfileOnOutside(e) {
+  const menu = document.getElementById('profileMenu');
+  const foot = document.querySelector('.sidebar-foot');
+  if (!foot.contains(e.target)) closeProfileMenu();
+}
+
+async function saveProfile() {
+  const name = document.getElementById('profileName').value.trim();
+  const code = document.getElementById('profileCode').value.trim().toUpperCase();
+  if (!name) { toast('⚠️','Nama tidak boleh kosong!'); return; }
+
+  const { error } = await sb.from('profiles')
+    .update({ full_name: name, cs_code: code })
+    .eq('id', currentUser.id);
+
+  if (error) { toast('❌','Gagal simpan: ' + error.message); return; }
+
+  currentProfile.full_name = name;
+  currentProfile.cs_code = code;
+  document.getElementById('userName').textContent = name;
+  closeProfileMenu();
+  toast('✅','Profil berhasil diupdate!');
+}
+
+// ════════════════════════════════════════════
 // AVATAR UPLOAD
 // ════════════════════════════════════════════
 function openAvatarUpload() {
@@ -2224,33 +2304,27 @@ async function uploadAvatar(input) {
 
   toast('⏳', 'Mengupload foto...');
 
-  const ext = file.name.split('.').pop();
-  const path = `avatars/${currentUser.id}.${ext}`;
+  const ext = file.name.split('.').pop().toLowerCase();
+  const path = `${currentUser.id}/avatar.${ext}`;
 
-  // Upload ke Supabase Storage
   const { error: upErr } = await sbAdmin.storage
     .from('avatars')
     .upload(path, file, { upsert: true, contentType: file.type });
 
   if (upErr) { toast('❌', 'Gagal upload: ' + upErr.message); return; }
 
-  // Get public URL
   const { data: urlData } = sbAdmin.storage.from('avatars').getPublicUrl(path);
-  const avatarUrl = urlData.publicUrl + '?t=' + Date.now(); // cache bust
+  const avatarUrl = urlData.publicUrl + '?t=' + Date.now();
 
-  // Update profile
   const { error: updateErr } = await sb.from('profiles')
     .update({ avatar_url: avatarUrl })
     .eq('id', currentUser.id);
 
   if (updateErr) { toast('❌', 'Gagal simpan: ' + updateErr.message); return; }
 
-  // Update UI langsung
   currentProfile.avatar_url = avatarUrl;
-  const avaEl = document.getElementById('userAva');
-  avaEl.style.backgroundImage = `url(${avatarUrl})`;
-  avaEl.textContent = '';
-
+  const initials = (currentProfile?.full_name||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+  updateAvatarUI(avatarUrl, initials);
   toast('✅', 'Foto profil berhasil diupdate!');
   input.value = '';
 }

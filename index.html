@@ -2046,7 +2046,12 @@ function processImportRows(rows, startRow, forceCs) {
   const iJadwalFu = col(['RECALL','JEMPUT POLA','JADWAL FU']);
   const iCatatan  = col(['CATATA','CATATAN']);
   const iTanggal  = col(['TANGGAL']);
-  const iResi     = col(['RESI','NO RESI','KODE RESI','NOMOR RESI']);
+  // Cari kolom RESI yang isinya nomor (bukan INFO RESI yang boolean)
+  // Ambil semua index kolom bernama RESI (bukan INFO RESI)
+  const resiCols = [];
+  headers.forEach((h, i) => {
+    if (h === 'RESI' || h === 'NO RESI' || h === 'NOMOR RESI') resiCols.push(i);
+  });
   // RO columns
   const iRo = [1,2,3,4,5,6,7,8,9,10].map(n => col(['RO '+n,'RO'+n,'REPEAT ORDER '+n,'RO-'+n]));
 
@@ -2072,7 +2077,14 @@ function processImportRows(rows, startRow, forceCs) {
       last_fu: iLastFu >= 0 ? parseDate(r[iLastFu]) : null,
       jadwal_fu: iJadwalFu >= 0 ? parseDate(r[iJadwalFu]) : null,
       catatan: iCatatan >= 0 ? String(r[iCatatan]||'').trim() : '',
-      resi: iResi >= 0 ? String(r[iResi]||'').trim() : '',
+      resi: (() => {
+        // Cari nilai resi yang valid dari semua kolom RESI
+        for (const ci of resiCols) {
+          const v = String(r[ci]||'').trim();
+          if (v && v !== 'true' && v !== 'false' && v !== 'TRUE' && v !== 'FALSE' && v.length > 4) return v;
+        }
+        return '';
+      })(),
       _cs_name: csName,
       _force_cs: forceCs || null,
       ...Object.fromEntries([1,2,3,4,5,6,7,8,9,10].map((n,i) => {

@@ -1998,12 +1998,14 @@ async function doUpdateProgres() {
     from += 1000;
   }
 
-  // Build lookup maps — skip resi yang isinya 'true' (boolean, bukan nomor resi)
-  const resiMap = {};
+  // Build lookup maps — simpan SEMUA id per resi (ada data duplikat)
+  const resiMap = {}; // resi -> [ids]
   const hpMap = {};
   allCustomers.forEach(c => {
     if (c.resi && c.resi !== 'true' && c.resi !== 'false' && c.resi.length > 4) {
-      resiMap[c.resi.trim().toLowerCase()] = c.id;
+      const key = c.resi.trim().toLowerCase();
+      if (!resiMap[key]) resiMap[key] = [];
+      resiMap[key].push(c.id);
     }
     if (c.no_hp) {
       if (!hpMap[c.no_hp]) hpMap[c.no_hp] = [];
@@ -2019,8 +2021,8 @@ async function doUpdateProgres() {
   for (const d of progresData) {
     let targetIds = [];
     if (d.resi) {
-      const id = resiMap[d.resi.toLowerCase()];
-      if (id) targetIds = [id];
+      const ids = resiMap[d.resi.toLowerCase()];
+      if (ids) targetIds = ids;
     }
     if (!targetIds.length && d.no_hp) {
       targetIds = hpMap[d.no_hp] || [];

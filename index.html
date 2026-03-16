@@ -738,6 +738,7 @@ function buildSidebarNav() {
       <div class="nav-item" onclick="switchView('fu_overdue',this)"><span class="ic">🔴</span>FU Terlambat<span class="nav-badge nb-red" id="navOverdue">0</span></div>
       <div class="nav-item" onclick="switchView('fu_today',this)"><span class="ic">🟡</span>FU Hari Ini<span class="nav-badge nb-orange" id="navToday">0</span></div>
       <div class="nav-item" onclick="switchView('fu_week',this)"><span class="ic">🟢</span>FU 7 Hari<span class="nav-badge nb-green" id="navWeek">0</span></div>
+      <div class="nav-item" onclick="switchView('cs_import',this)"><span class="ic">📥</span>Import Data</div>
     </div>
     <div class="nav-sect">
       <div class="nav-label">Filter Label</div>
@@ -839,6 +840,7 @@ function switchView(view, navEl) {
   if (view === 'admin_cs') { renderAdminCS(); return; }
   if (view === 'admin_import') { renderAdminImport(); return; }
   if (view === 'admin_users') { renderAdminUsers(); return; }
+  if (view === 'cs_import') { renderCSImport(); return; }
   // Data filter views
   filtered = customers.filter(d => {
     if (view === 'fu_overdue') return fuStatus(d) === 'overdue';
@@ -1243,6 +1245,127 @@ async function delCustomer(id) {
 // ════════════════════════════════════════════
 // ADMIN VIEWS
 // ════════════════════════════════════════════
+// ════════════════════════════════════════════
+// IMPORT DATA UNTUK CS
+// ════════════════════════════════════════════
+async function renderCSImport() {
+  document.getElementById('topTitle').textContent = '📥 Import Data Customer';
+  document.getElementById('addBtn').style.display = 'none';
+  document.getElementById('exportBtn').style.display = 'none';
+  document.getElementById('searchBoxWrap').style.display = 'none';
+
+  document.getElementById('mainContent').innerHTML = `
+    <div class="table-card" style="margin-bottom:16px">
+      <div class="table-head"><span class="table-ttl">📁 Upload File Excel / CSV</span></div>
+      <div style="padding:20px">
+        <div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px;color:var(--text-dim);line-height:1.8">
+          <strong>📋 Format kolom yang dikenali:</strong><br>
+          NAMA, NO HP, KAB/KABUPATEN, KEC/KECAMATAN, PROV/PROVINSI,<br>
+          STATUS PAKET, PENYAKIT, USIA, JENIS KELAMIN,<br>
+          CRM, LAST FU, RECALL/JEMPUT POLA, CATATAN<br><br>
+          ✅ Data otomatis masuk ke akun Anda
+        </div>
+        <div class="fg">
+          <div class="fl">Pilih File (.xlsx atau .csv) *</div>
+          <input type="file" class="fi" id="csImportFile" accept=".xlsx,.csv" onchange="previewCSImportFile(this)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div id="csImportPreview" style="display:none">
+      <div class="table-card">
+        <div class="table-head">
+          <span class="table-ttl" id="csPreviewTitle">Preview Data</span>
+          <span class="result-count" id="csPreviewCount">0 baris</span>
+          <button class="btn btn-primary btn-sm" style="margin-left:8px" onclick="doCSImport()">⬆️ Import Sekarang</button>
+        </div>
+        <div style="overflow-x:auto"><table><thead id="csPreviewHead"></thead><tbody id="csPreviewBody"></tbody></table></div>
+        <div style="padding:14px 16px;font-size:12px;color:var(--text-muted)">Menampilkan 10 baris pertama sebagai preview</div>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div id="csImportProgress" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;text-align:center">
+      <div class="spinner" style="margin:0 auto 12px"></div>
+      <div style="font-weight:600;font-size:14px" id="csImportProgressText">Mengimport data...</div>
+    </div>
+  `;
+}
+
+let csImportData = [];
+
+async function previewCSImportFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  try {
+    let rows;
+    if (file.name.endsWith('.csv')) {
+      rows = parseCSV(await file.text());
+    } else {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    }
+    // Force assign ke CS yang login
+    csImportData = processImportRows(rows, 2, currentUser.id);
+    // Override _force_cs ke current user
+    csImportData = csImportData.map(d => ({...d, _force_cs: currentUser.id}));
+
+    if (!csImportData.length) { toast('⚠️','Tidak ada data valid'); return; }
+
+    document.getElementById('csImportPreview').style.display = '';
+    document.getElementById('csPreviewTitle').textContent = `Preview: ${file.name}`;
+    document.getElementById('csPreviewCount').textContent = `${csImportData.length} baris`;
+
+    const cols = ['nama','no_hp','kabupaten','status_paket','penyakit','usia'];
+    const labels = ['Nama','No HP','Kota','Status','Penyakit','Usia'];
+    document.getElementById('csPreviewHead').innerHTML = `<tr>${labels.map(l=>`<th>${l}</th>`).join('')}</tr>`;
+    document.getElementById('csPreviewBody').innerHTML = csImportData.slice(0,10).map(r=>
+      `<tr>${cols.map(c=>`<td style="font-size:12px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r[c]||'—'}</td>`).join('')}</tr>`
+    ).join('');
+
+    toast('✅', `${csImportData.length} baris siap diimport!`);
+  } catch(e) {
+    toast('❌', 'Gagal baca file: ' + e.message);
+  }
+}
+
+async function doCSImport() {
+  if (!csImportData.length) { toast('⚠️','Tidak ada data'); return; }
+  document.getElementById('csImportPreview').style.display = 'none';
+  document.getElementById('csImportProgress').style.display = '';
+  const progText = document.getElementById('csImportProgressText');
+
+  let success = 0, failed = 0;
+  const BATCH = 50;
+
+  for (let i = 0; i < csImportData.length; i += BATCH) {
+    const batch = csImportData.slice(i, i + BATCH);
+    progText.textContent = `Mengimport... ${Math.min(i+BATCH, csImportData.length)} / ${csImportData.length}`;
+    const rows = batch.map(d => {
+      const { _cs_name, _force_cs, ...clean } = d;
+      return { ...clean, cs_id: currentUser.id };
+    });
+    const { error } = await sb.from('customers').insert(rows);
+    if (error) { failed += batch.length; console.error(error); }
+    else success += batch.length;
+  }
+
+  document.getElementById('csImportProgress').style.display = 'none';
+  document.getElementById('mainContent').innerHTML += `
+    <div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:12px;padding:24px;text-align:center;margin-top:16px">
+      <div style="font-size:36px;margin-bottom:12px">✅</div>
+      <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:18px;margin-bottom:6px">Import Selesai!</div>
+      <div style="font-size:14px;color:var(--text-muted)">${success} data berhasil • ${failed} gagal</div>
+      <button class="btn btn-primary" style="margin-top:16px" onclick="switchView('db',null);loadCustomers()">Lihat Database →</button>
+    </div>`;
+  csImportData = [];
+  await loadCustomers();
+  toast('✅', `${success} data berhasil diimport!`);
+}
+
 // ════════════════════════════════════════════
 // IMPORT DATA (Google Sheets / Excel / CSV)
 // ════════════════════════════════════════════

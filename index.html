@@ -526,7 +526,7 @@ let currentUser = null, currentProfile = null, customers = [], filtered = [];
 // View yang boleh di-override oleh loadCustomers() saat background refresh
 // View selain ini (cs_progres, admin_cs, admin_import, update_progres, admin_users, dll)
 // TIDAK akan di-override — user tetap di halaman yang sedang dibuka
-const DB_VIEWS = new Set(['db','fu_overdue','fu_today','fu_week','fu_resi','fu_edukasi','fu_promo','crm','delivered','testimoni','loyal','ro1','ro2','ro3','ro4','ro5','ro6','ro7','ro8','ro9','ro10']);
+const DB_VIEWS = new Set(['db','fu_overdue','fu_today','fu_week','fu_resi','fu_edukasi','fu_promo','crm','delivered','testimoni','loyal','data_baru','belum_fu','ro1','ro2','ro3','ro4','ro5','ro6','ro7','ro8','ro9','ro10']);
 let page = 1, perPage = 20, sortK = 'created_at', sortA = false;
 let activeFilter = 'all', activeView = 'db', selectedIds = new Set();
 let editingId = null, detailId = null, csStats = [];
@@ -743,6 +743,8 @@ function buildSidebarNav() {
       <div class="nav-item" onclick="switchView('delivered',this)"><span class="ic">✅</span>Delivered</div>
       <div class="nav-item" onclick="switchView('testimoni',this)"><span class="ic">⭐</span>Testimoni</div>
       <div class="nav-item" onclick="switchView('loyal',this)"><span class="ic">🌟</span>Customer Loyal</div>
+      <div class="nav-item" onclick="openDataBaruModal()"><span class="ic">🆕</span>Data Baru Hari Ini</div>
+      <div class="nav-item" onclick="switchView('belum_fu',this)"><span class="ic">📭</span>Belum di-FU</div>
     </div>
     <div class="nav-sect">
       <div class="nav-label">Repeat Order</div>
@@ -889,6 +891,8 @@ function switchView(view, navEl, keepFilter) {
     if (view === 'delivered') return d.status_paket === 'DELIVERED';
     if (view === 'testimoni') return d.info_testimoni;
     if (view === 'loyal') return d._loyal;
+    if (view === 'data_baru') return d.created_at && d.created_at.startsWith(TODAY_STR);
+    if (view === 'belum_fu') return !d.last_fu && !d.jadwal_fu;
     for (let i = 1; i <= 10; i++) { if (view === 'ro'+i) return !!d['ro'+i]; }
     return true;
   });
@@ -902,7 +906,8 @@ function renderView() {
     cs_progres:'🚚 Progres Orderan', crm:'💬 CRM Aktif', delivered:'✅ Delivered',
     testimoni:'⭐ Testimoni', loyal:'🌟 Customer Loyal',
     ro1:'🛒 RO 1',ro2:'🛒 RO 2',ro3:'🛒 RO 3',ro4:'🛒 RO 4',ro5:'🛒 RO 5',
-    ro6:'🛒 RO 6',ro7:'🛒 RO 7',ro8:'🛒 RO 8',ro9:'🛒 RO 9',ro10:'🛒 RO 10'
+    ro6:'🛒 RO 6',ro7:'🛒 RO 7',ro8:'🛒 RO 8',ro9:'🛒 RO 9',ro10:'🛒 RO 10',
+    data_baru:'🆕 Data Baru Hari Ini', belum_fu:'📭 Belum di-FU'
   };
   document.getElementById('topTitle').textContent = titles[activeView] || 'Database';
   document.getElementById('mobTitle').textContent = 'CRM ADSY';
@@ -974,12 +979,20 @@ function renderCustomerView() {
       <button class="btn btn-sm" style="background:rgba(245,158,11,.15);color:var(--accent3);border:1px solid rgba(245,158,11,.3)" onclick="switchView('fu_week',null)">Lihat →</button></div>`;
   }
 
-  const statsHTML = `<div class="stats-grid" style="grid-template-columns:repeat(5,1fr)">
+  const dataBaru = customers.filter(d => d.created_at && d.created_at.startsWith(TODAY_STR)).length;
+  const belumFu  = customers.filter(d => !d.last_fu && !d.jadwal_fu).length;
+  const statsHTML = `<div class="stats-grid" style="grid-template-columns:repeat(6,1fr)">
     <div class="stat-card c1" onclick="switchView('db',null)"><div class="stat-ic">👥</div><div class="stat-val">${customers.length}</div><div class="stat-lbl">Total Customer</div></div>
     <div class="stat-card c4" onclick="switchView('ro1',null)"><div class="stat-ic">🛒</div><div class="stat-val">${customers.filter(d=>d.ro1).length}</div><div class="stat-lbl">RO 1</div></div>
     <div class="stat-card c3" onclick="switchView('ro2',null)"><div class="stat-ic">🛒</div><div class="stat-val">${customers.filter(d=>d.ro2).length}</div><div class="stat-lbl">RO 2</div></div>
     <div class="stat-card c5" onclick="switchView('ro3',null)"><div class="stat-ic">🛒</div><div class="stat-val">${customers.filter(d=>d.ro3).length}</div><div class="stat-lbl">RO 3</div></div>
     <div class="stat-card c2" onclick="switchView('loyal',null)"><div class="stat-ic">⭐</div><div class="stat-val">${customers.filter(d=>d._beli>4).length}</div><div class="stat-lbl">RO &gt;4</div></div>
+    <div class="stat-card c6" onclick="openDataBaruModal()" style="border:2px solid rgba(167,139,250,.3);background:rgba(167,139,250,.06)">
+      <div class="stat-ic">🆕</div>
+      <div class="stat-val" style="color:#a78bfa">${dataBaru}</div>
+      <div class="stat-lbl">Data Baru Hari Ini</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:3px">${belumFu} belum FU</div>
+    </div>
   </div>`;
 
   const selHTML = selectedIds.size > 0 ? `
@@ -1107,6 +1120,53 @@ function rowHTML(d) {
 }
 
 function setPill(f) { activeFilter = f; page = 1; doSearch(); }
+
+// Modal pilihan Data Baru — tampil setelah klik card 🆕
+function openDataBaruModal() {
+  // Hapus modal lama jika ada
+  const old = document.getElementById('dataBaruModal');
+  if (old) old.remove();
+
+  const dataBaru = customers.filter(d => d.created_at && d.created_at.startsWith(TODAY_STR)).length;
+  const belumFu  = customers.filter(d => !d.last_fu && !d.jadwal_fu).length;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'dataBaruModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px';
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:100%;max-width:420px;animation:slideUp .2s ease">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px">🆕 Tampilkan Data Baru</div>
+        <div onclick="document.getElementById('dataBaruModal').remove()" style="cursor:pointer;width:28px;height:28px;border-radius:7px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:14px">✕</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div onclick="document.getElementById('dataBaruModal').remove(); switchView('data_baru',null)"
+          style="background:rgba(167,139,250,.08);border:2px solid rgba(167,139,250,.3);border-radius:12px;padding:16px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:14px"
+          onmouseover="this.style.borderColor='#a78bfa'" onmouseout="this.style.borderColor='rgba(167,139,250,.3)'">
+          <span style="font-size:28px">🆕</span>
+          <div>
+            <div style="font-weight:600;font-size:14px;margin-bottom:3px">Baru Masuk Hari Ini</div>
+            <div style="font-size:12px;color:var(--text-muted)">Customer yang diimport hari ini (${dataBaru} customer)</div>
+          </div>
+          <span style="margin-left:auto;font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:#a78bfa">${dataBaru}</span>
+        </div>
+        <div onclick="document.getElementById('dataBaruModal').remove(); switchView('belum_fu',null)"
+          style="background:rgba(245,158,11,.06);border:2px solid rgba(245,158,11,.25);border-radius:12px;padding:16px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:14px"
+          onmouseover="this.style.borderColor='var(--accent3)'" onmouseout="this.style.borderColor='rgba(245,158,11,.25)'">
+          <span style="font-size:28px">📭</span>
+          <div>
+            <div style="font-weight:600;font-size:14px;margin-bottom:3px">Belum di-FU</div>
+            <div style="font-size:12px;color:var(--text-muted)">Customer yang belum pernah di-follow up (${belumFu} customer)</div>
+          </div>
+          <span style="margin-left:auto;font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:var(--accent3)">${belumFu}</span>
+        </div>
+      </div>
+      <div style="margin-top:16px;font-size:11px;color:var(--text-muted);text-align:center">Klik salah satu untuk melihat data</div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
 function doSort(k) { if(sortK===k) sortA=!sortA; else{sortK=k;sortA=true;} renderCustomerView(); }
 function toggleRow(id, cb) { if(cb.checked) selectedIds.add(id); else selectedIds.delete(id); renderCustomerView(); }
 function toggleSelectAll(cb) {

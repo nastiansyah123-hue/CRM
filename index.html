@@ -951,10 +951,10 @@ async function loadCustomers() {
 }
 
 async function loadCSStats() {
-  // cs_stats adalah view aggregate, tidak kena limit data biasa
-  // tapi tetap pakai range untuk jaga-jaga jika CS banyak
-  const { data } = await sb.from('cs_stats').select('*').limit(500);
-  csStats = data || [];
+  try {
+    const { data } = await sb.from('cs_stats').select('*').limit(500);
+    csStats = data || [];
+  } catch(e) { console.log('cs_stats error:', e.message); csStats = []; }
 }
 
 // ════════════════════════════════════════════
@@ -1981,10 +1981,12 @@ async function renderAdminCS() {
   document.getElementById('mainContent').innerHTML = '<div class="empty"><div class="spinner"></div></div>';
   await loadCSStats();
 
-  // Load mood hari ini semua CS
-  const { data: moods } = await sb.from('cs_mood_today').select('*');
-  const moodMap = {};
-  (moods||[]).forEach(m => { moodMap[m.cs_id] = m; });
+  // Load mood hari ini semua CS (skip kalau view belum ada)
+  let moodMap = {};
+  try {
+    const { data: moods } = await sb.from('cs_mood_today').select('*');
+    (moods||[]).forEach(m => { moodMap[m.cs_id] = m; });
+  } catch(e) { console.log('Mood view not ready:', e.message); }
 
   // Load avatar semua CS sekaligus
   const { data: allProfiles } = await sb.from('profiles').select('id,avatar_url').eq('role','cs');

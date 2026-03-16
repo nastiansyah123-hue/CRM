@@ -1760,47 +1760,98 @@ function renderProgresOrderan() {
   `;
 }
 
+let progresPage = 1;
+const PROGRES_PER_PAGE = 50;
+let progresFilter = 'all';
+let progresSelected = new Set();
+
 function showProgresDetail(filter) {
-  // Highlight kartu yang dipilih
+  progresFilter = filter;
+  progresPage = 1;
+  progresSelected.clear();
   ['all','delivered','pending','undell','rts'].forEach(f => {
     const el = document.getElementById('pc-'+f);
     if (el) el.style.transform = f === filter ? 'scale(1.03)' : 'scale(1)';
   });
+  renderProgresTable();
+}
 
-  // Filter data
+function renderProgresTable() {
   const data = customers.filter(d => {
-    if (filter === 'all') return true;
-    if (filter === 'delivered') return d.status_paket === 'DELIVERED';
-    if (filter === 'pending') return !['DELIVERED','RTS','UNDELL'].includes(d.status_paket);
-    if (filter === 'undell') return d.status_paket === 'UNDELL';
-    if (filter === 'rts') return d.status_paket === 'RTS';
+    if (progresFilter === 'all') return true;
+    if (progresFilter === 'delivered') return d.status_paket === 'DELIVERED';
+    if (progresFilter === 'pending') return !['DELIVERED','RTS','UNDELL'].includes(d.status_paket);
+    if (progresFilter === 'undell') return d.status_paket === 'UNDELL';
+    if (progresFilter === 'rts') return d.status_paket === 'RTS';
   });
-
   const labels = {'all':'Semua','delivered':'Delivered','pending':'On Proses','undell':'Undell','rts':'RTS'};
+  const total = data.length;
+  const pages = Math.ceil(total / PROGRES_PER_PAGE);
+  const start = (progresPage - 1) * PROGRES_PER_PAGE;
+  const pageData = data.slice(start, start + PROGRES_PER_PAGE);
+  const allChecked = pageData.length > 0 && pageData.every(d => progresSelected.has(d.id));
+
+  const statusBadge = (s) => s==='DELIVERED'?'<span class="badge b-delivered">✓ Delivered</span>':s==='RTS'?'<span class="badge b-rts">↩ RTS</span>':s==='UNDELL'?'<span class="badge b-undell">⚠️ Undell</span>':'<span class="badge b-pending">— Proses</span>';
+
+  let pgBtns = '';
+  if (progresPage > 1) pgBtns += `<button class="btn btn-ghost btn-sm" onclick="progresPage--;renderProgresTable()">← Prev</button>`;
+  const ps = Math.max(1, progresPage-2), pe = Math.min(pages, ps+4);
+  for (let p = ps; p <= pe; p++) pgBtns += `<button class="btn btn-sm ${p===progresPage?'btn-primary':'btn-ghost'}" onclick="progresPage=${p};renderProgresTable()">${p}</button>`;
+  if (progresPage < pages) pgBtns += `<button class="btn btn-ghost btn-sm" onclick="progresPage++;renderProgresTable()">Next →</button>`;
 
   document.getElementById('progresDataTable').innerHTML = `
     <div class="table-card">
-      <div class="table-head">
-        <span class="table-ttl">${labels[filter]} — ${data.length} data</span>
+      <div class="table-head" style="flex-wrap:wrap;gap:8px">
+        <span class="table-ttl">${labels[progresFilter]} — ${total} data</span>
+        <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap">
+          ${progresSelected.size > 0 ? `<button class="btn btn-success btn-sm" onclick="exportProgresExcel(false)">📊 Export Dipilih (${progresSelected.size})</button>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="exportProgresExcel(true)">📊 Export Semua</button>
+        </div>
       </div>
       <div style="overflow-x:auto"><table>
         <thead><tr>
+          <th style="width:32px"><input type="checkbox" ${allChecked?'checked':''} onchange="toggleProgresAll(this,[${pageData.map(d=>d.id).join(',')}])"></th>
           <th>Nama</th><th>No HP</th><th>Kota</th><th>Status</th><th>Resi</th>
         </tr></thead>
-        <tbody>
-          ${data.slice(0,50).map(d => `<tr onclick="openDetail(${d.id})" style="cursor:pointer">
-            <td style="font-size:12px;font-weight:600">${d.nama||'—'}</td>
-            <td style="font-size:12px"><a class="wa-link" href="https://wa.me/${d.no_hp}" target="_blank" onclick="event.stopPropagation()">📱 ${d.no_hp||'—'}</a></td>
-            <td style="font-size:12px;color:var(--text-muted)">${d.kabupaten||'—'}</td>
-            <td>${d.status_paket==='DELIVERED'?'<span class="badge b-delivered">✓ Delivered</span>':d.status_paket==='RTS'?'<span class="badge b-rts">↩ RTS</span>':d.status_paket==='UNDELL'?'<span class="badge b-undell">⚠️ Undell</span>':'<span class="badge b-pending">— Proses</span>'}</td>
-            <td style="font-size:11px;color:var(--text-muted)">${d.resi||'—'}</td>
-          </tr>`).join('')}
-        </tbody>
+        <tbody>${pageData.map(d => `<tr style="background:${progresSelected.has(d.id)?'rgba(59,130,246,.06)':''}">
+          <td onclick="event.stopPropagation()"><input type="checkbox" ${progresSelected.has(d.id)?'checked':''} onchange="toggleProgresRow(${d.id},this)"></td>
+          <td style="font-size:12px;font-weight:600;cursor:pointer" onclick="openDetail(${d.id})">${d.nama||'—'}</td>
+          <td style="font-size:12px"><a class="wa-link" href="https://wa.me/${d.no_hp}" target="_blank" onclick="event.stopPropagation()">📱 ${d.no_hp||'—'}</a></td>
+          <td style="font-size:12px;color:var(--text-muted)">${d.kabupaten||'—'}</td>
+          <td>${statusBadge(d.status_paket)}</td>
+          <td style="font-size:11px;color:var(--text-muted)">${d.resi||'—'}</td>
+        </tr>`).join('')}</tbody>
       </table></div>
-      ${data.length > 50 ? `<div style="padding:12px 16px;font-size:12px;color:var(--text-muted)">Menampilkan 50 dari ${data.length} data</div>` : ''}
-    </div>
-  `;
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;font-size:12px;flex-wrap:wrap;gap:8px">
+        <span style="color:var(--text-muted)">Hal ${progresPage}/${pages} · ${total} data</span>
+        <div style="display:flex;gap:4px">${pgBtns}</div>
+      </div>
+    </div>`;
+}
 
+function toggleProgresRow(id, cb) {
+  if (cb.checked) progresSelected.add(id); else progresSelected.delete(id);
+  renderProgresTable();
+}
+
+function toggleProgresAll(cb, ids) {
+  ids.forEach(id => cb.checked ? progresSelected.add(id) : progresSelected.delete(id));
+  renderProgresTable();
+}
+
+function exportProgresExcel(all) {
+  const data = all ? customers.filter(d => {
+    if (progresFilter === 'all') return true;
+    if (progresFilter === 'delivered') return d.status_paket === 'DELIVERED';
+    if (progresFilter === 'pending') return !['DELIVERED','RTS','UNDELL'].includes(d.status_paket);
+    if (progresFilter === 'undell') return d.status_paket === 'UNDELL';
+    if (progresFilter === 'rts') return d.status_paket === 'RTS';
+  }) : customers.filter(d => progresSelected.has(d.id));
+  const ws = XLSX.utils.json_to_sheet(data.map(d => ({'Nama':d.nama,'No HP':d.no_hp,'Kota':d.kabupaten,'Status':d.status_paket,'Resi':d.resi||'','Penyakit':d.penyakit||''})));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Progres');
+  XLSX.writeFile(wb, `progres_${progresFilter}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  toast('✅', `${data.length} data diekspor!`);
 }
 
 // ════════════════════════════════════════════

@@ -523,47 +523,30 @@ tbody tr.selected-row{background:rgba(59,130,246,.06)!important}
 <div class="toast" id="toast"><span id="tIc">✅</span><span id="tMsg"></span></div>
 
 <!-- Library CDN — harus sebelum script app -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script crossorigin src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <script>
-// Semua kode dijalankan setelah CDN library selesai load
-window.addEventListener('load', function() {
 // ════════════════════════════════════════════
-// CONFIG
+// CONFIG — global agar bisa diakses dari mana saja
 // ════════════════════════════════════════════
 const SUPABASE_URL = 'https://rudkeajhbtgtltcbzqlg.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1ZGtlYWpoYnRndGx0Y2J6cWxnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2Mzc5MDcsImV4cCI6MjA4OTIxMzkwN30.Ahn7hs8ta3UdH9Wf21hOo5QItgrVMMMjUlXWWgLj040';
 const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ1ZGtlYWpoYnRndGx0Y2J6cWxnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzYzNzkwNywiZXhwIjoyMDg5MjEzOTA3fQ.69xjEPPvoES3j_PiNc6gNxwi8gtUPyOJ8ouDHHV4dU4';
 
-// Client biasa untuk login CS/Admin
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-// Client admin untuk buat user baru (bypass RLS)
 const sbAdmin = supabase.createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-    storageKey: 'sb-admin-client'
-  }
+  auth: { autoRefreshToken: false, persistSession: false, storageKey: 'sb-admin-client' }
 });
 
-// ════════════════════════════════════════════
-// STATE
-// ════════════════════════════════════════════
-let currentUser = null;
-let currentProfile = null;
-let customers = [];
-let filtered = [];
-let page = 1;
-let perPage = 20;
-let sortK = 'created_at';
-let sortA = false;
-let activeFilter = 'all';
-let activeView = 'db';
-let selectedIds = new Set();
-let editingId = null;
-let detailId = null;
-let csStats = [];
+// STATE — global
+let currentUser = null, currentProfile = null, customers = [], filtered = [];
+let page = 1, perPage = 20, sortK = 'created_at', sortA = false;
+let activeFilter = 'all', activeView = 'db', selectedIds = new Set();
+let editingId = null, detailId = null, csStats = [];
+
+// Jalankan app setelah DOM siap
+document.addEventListener('DOMContentLoaded', function() {
 
 const COLORS = [
   {bg:'rgba(59,130,246,.2)',c:'#3b82f6'},{bg:'rgba(6,182,212,.2)',c:'#06b6d4'},
@@ -1565,7 +1548,7 @@ function toast(ic, msg) {
 // START
 // ════════════════════════════════════════════
   boot();
-}); // end window.onload
+}); // end DOMContentLoaded
 </script>
 </body>
 </html>

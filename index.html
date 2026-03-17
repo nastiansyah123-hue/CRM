@@ -778,51 +778,75 @@ async function loadCustomers() {
     return { ...d, _ci: i % COLORS.length, _beli: 1 + roCount, _loyal: roCount >= 10 };
   });
 
-  // Pakai sbAdmin (service key) untuk bypass RLS limit 1000 baris
-  // Data tetap aman karena filter cs_id diterapkan manual di sini
-  let q1 = sbAdmin.from('customers').select('*').order('created_at', {ascending: false}).range(0, LIMIT - 1);
-  if (!isAdmin) q1 = q1.eq('cs_id', currentUser.id);
-  const { data: first, error } = await q1;
-  if (error) { toast('❌', 'Gagal memuat: ' + error.message); return; }
-  let allData = first || [];
+  // Gunakan fetch langsung dengan header Range untuk bypass Supabase max_rows limit
+  // sbAdmin.from() terkena setting max_rows di Supabase Dashboard (default 1000)
+  // Fetch langsung dengan header "Range" bisa melewati batasan ini
+  async function fetchBatch(from) {
+    const csFilter = !isAdmin ? `&cs_id=eq.${currentUser.id}` : '';
+    const url = `${SUPABASE_URL}/rest/v1/customers?select=*&order=created_at.desc${csFilter}&offset=${from}&limit=${LIMIT}`;
+    const res = await fetch(url, {
+      headers: {
+        'apikey': SUPABASE_SERVICE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+        'Range-Unit': 'items',
+        'Range': `${from}-${from + LIMIT - 1}`,
+        'Prefer': 'count=none'
+      }
+    });
+    if (!res.ok) return [];
+    return await res.json();
+  }
+
+  let allData = [];
+  let from = 0;
+  let batchNum = 0;
+  const oldBanner = document.getElementById('bgLoadBanner');
+  if (oldBanner) oldBanner.remove();
+
+  while (batchNum < 50) { // max 50.000 data
+    const loadTxt = document.getElementById('loadingText');
+    if (loadTxt && batchNum > 0) loadTxt.textContent = `Memuat... ${allData.length} data`;
+
+    const batch = await fetchBatch(from);
+    if (!batch || batch.length === 0) break;
+
+    allData = allData.concat(batch);
+    from += batch.length;
+
+    if (batchNum === 0) {
+      customers = buildCustomers(allData);
+      filtered = [...customers];
+      updateStats();
+      if (DB_VIEWS.has(activeView)) renderView();
+      if (isAdmin) loadCSStats();
+
+      if (batch.length < LIMIT) break;
+
+      const banner = document.createElement('div');
+      banner.id = 'bgLoadBanner';
+      banner.style.cssText = 'position:fixed;bottom:16px;right:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:12px;color:var(--text-muted);box-shadow:0 4px 16px rgba(0,0,0,.3);z-index:500;display:flex;align-items:center;gap:8px';
+      banner.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px"></div><span id="bgLoadText">Memuat semua data...</span>';
+      document.body.appendChild(banner);
+    } else {
+      customers = buildCustomers(allData);
+      filtered = [...customers];
+      updateStats();
+      const t = document.getElementById('bgLoadText');
+      if (t) t.textContent = `Memuat... ${allData.length} data`;
+      if (batch.length < LIMIT) break;
+    }
+    batchNum++;
+  }
+
+  // Selesai semua batch
   customers = buildCustomers(allData);
   filtered = [...customers];
   updateStats();
   if (DB_VIEWS.has(activeView)) renderView();
   if (isAdmin) loadCSStats();
 
-  // Lanjut load sisa data — selalu coba jika batch pertama >= LIMIT
-  if (allData.length >= LIMIT) {
-    const oldBanner = document.getElementById('bgLoadBanner');
-    if (oldBanner) oldBanner.remove();
-    const banner = document.createElement('div');
-    banner.id = 'bgLoadBanner';
-    banner.style.cssText = 'position:fixed;bottom:16px;right:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:12px;color:var(--text-muted);box-shadow:0 4px 16px rgba(0,0,0,.3);z-index:500;display:flex;align-items:center;gap:8px';
-    banner.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px"></div><span id="bgLoadText">Memuat semua data...</span>';
-    document.body.appendChild(banner);
-
-    let from = allData.length;
-    let retryCount = 0;
-    while (retryCount < 20) {
-      let q2 = sbAdmin.from('customers').select('*').order('created_at', {ascending: false}).range(from, from + LIMIT - 1);
-      if (!isAdmin) q2 = q2.eq('cs_id', currentUser.id);
-      const { data: more, error: err2 } = await q2;
-      if (err2 || !more || more.length === 0) break;
-      allData = allData.concat(more);
-      from += more.length;
-      const t = document.getElementById('bgLoadText');
-      if (t) t.textContent = `Memuat... ${allData.length} data`;
-      customers = buildCustomers(allData);
-      filtered = [...customers];
-      updateStats();
-      if (more.length < LIMIT) break;
-      retryCount++;
-    }
-    if (DB_VIEWS.has(activeView)) renderView();
-    const b = document.getElementById('bgLoadBanner');
-    if (b) { b.innerHTML = `✅ ${allData.length} data dimuat`; setTimeout(()=>b.remove(),2000); }
-    if (isAdmin) loadCSStats();
-  }
+  const b = document.getElementById('bgLoadBanner');
+  if (b) { b.innerHTML = `✅ ${allData.length} data dimuat`; setTimeout(() => b.remove(), 2500); }
 }
 
 async function loadCSStats() {
@@ -1479,23 +1503,31 @@ async function refreshProgresOrderan() {
     const roCount = [1,2,3,4,5,6,7,8,9,10].filter(n => d['ro'+n]).length;
     return { ...d, _ci: i % COLORS.length, _beli: 1 + roCount, _loyal: roCount >= 10 };
   });
-  let q = sbAdmin.from('customers').select('*').order('created_at', {ascending: false}).range(0, LIMIT - 1);
-  if (!isAdmin) q = q.eq('cs_id', currentUser.id);
-  const { data: first } = await q;
-  let allData = first || [];
-  if (allData.length >= LIMIT) {
-    let from = allData.length;
-    let retryCount = 0;
-    while (retryCount < 20) {
-      let q2 = sbAdmin.from('customers').select('*').order('created_at', {ascending: false}).range(from, from + LIMIT - 1);
-      if (!isAdmin) q2 = q2.eq('cs_id', currentUser.id);
-      const { data: more } = await q2;
-      if (!more || more.length === 0) break;
-      allData = allData.concat(more);
-      from += more.length;
-      if (more.length < LIMIT) break;
-      retryCount++;
-    }
+
+  async function fetchBatchRefresh(from) {
+    const csFilter = !isAdmin ? `&cs_id=eq.${currentUser.id}` : '';
+    const url = `${SUPABASE_URL}/rest/v1/customers?select=*&order=created_at.desc${csFilter}&offset=${from}&limit=${LIMIT}`;
+    const res = await fetch(url, {
+      headers: {
+        'apikey': SUPABASE_SERVICE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+        'Range-Unit': 'items',
+        'Range': `${from}-${from + LIMIT - 1}`,
+        'Prefer': 'count=none'
+      }
+    });
+    if (!res.ok) return [];
+    return await res.json();
+  }
+
+  let allData = [], from = 0, batchNum = 0;
+  while (batchNum < 50) {
+    const batch = await fetchBatchRefresh(from);
+    if (!batch || batch.length === 0) break;
+    allData = allData.concat(batch);
+    from += batch.length;
+    if (batch.length < LIMIT) break;
+    batchNum++;
   }
   customers = buildCustomers(allData);
   filtered = [...customers];

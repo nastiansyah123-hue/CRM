@@ -2209,19 +2209,41 @@ async function viewCSData(csId, csName) {
   document.getElementById('topTitle').textContent = `👤 ${csName}`;
   document.getElementById('addBtn').style.display = ''; document.getElementById('searchBoxWrap').style.display = ''; document.getElementById('exportBtn').style.display = '';
   activeView = 'db';
-  document.getElementById('mainContent').innerHTML = '<div class="empty"><div class="spinner"></div><div class="loading-sub" style="margin-top:12px" id="loadingText">Memuat data...</div></div>';
-  let allData = [], from = 0, retryCount = 0;
-  while (retryCount < 20) {
+  document.getElementById('mainContent').innerHTML = '<div class="empty"><div class="spinner"></div><div class="loading-sub" style="margin-top:12px" id="loadingText">Memuat data... 0 baris</div></div>';
+
+  const LIMIT = 1000;
+  let allData = [], lastCreatedAt = null, batchNum = 0;
+
+  while (batchNum < 50) {
     const loadTxt = document.getElementById('loadingText');
     if (loadTxt) loadTxt.textContent = `Memuat data... ${allData.length} baris`;
-    const { data, error } = await sbAdmin.from('customers').select('*').eq('cs_id', csId).order('created_at', { ascending: false }).range(from, from + 999);
-    if (error || !data || data.length === 0) break;
+
+    const cursorFilter = lastCreatedAt ? `&created_at=lt.${encodeURIComponent(lastCreatedAt)}` : '';
+    const url = `${SUPABASE_URL}/rest/v1/customers?select=*&cs_id=eq.${csId}&order=created_at.desc${cursorFilter}&limit=${LIMIT}`;
+    const res = await fetch(url, {
+      headers: {
+        'apikey': SUPABASE_SERVICE_KEY,
+        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+        'Prefer': 'count=none'
+      }
+    });
+    if (!res.ok) break;
+    const data = await res.json();
+    if (!data || data.length === 0) break;
+
     allData = allData.concat(data);
-    from += data.length; // pakai panjang actual
-    if (data.length < 1000) break;
-    retryCount++;
+    lastCreatedAt = data[data.length - 1].created_at;
+    if (data.length < LIMIT) break;
+    batchNum++;
   }
-  customers = allData.map((d, i) => { const roCount = [1,2,3,4,5,6,7,8,9,10].filter(n => d['ro'+n]).length; return { ...d, _ci: i % COLORS.length, _beli: 1 + roCount, _loyal: roCount >= 10 }; });
+
+  const loadTxt = document.getElementById('loadingText');
+  if (loadTxt) loadTxt.textContent = `✅ ${allData.length} data dimuat`;
+
+  customers = allData.map((d, i) => {
+    const roCount = [1,2,3,4,5,6,7,8,9,10].filter(n => d['ro'+n]).length;
+    return { ...d, _ci: i % COLORS.length, _beli: 1 + roCount, _loyal: roCount >= 10 };
+  });
   filtered = [...customers]; page = 1; renderCustomerView();
 }
 

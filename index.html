@@ -785,31 +785,38 @@ async function loadCustomers() {
   customers = buildCustomers(allData);
   filtered = [...customers];
   updateStats();
-  // Hanya render jika sedang di view database, jangan override view lain
   if (DB_VIEWS.has(activeView)) renderView();
   if (isAdmin) loadCSStats();
-  if (allData.length === LIMIT) {
+
+  // Lanjut load sisa data jika batch pertama sudah penuh (kemungkinan masih ada lebih)
+  // Pakai >= bukan === karena Supabase kadang return sedikit kurang dari LIMIT karena RLS
+  if (allData.length >= LIMIT) {
     const banner = document.createElement('div');
     banner.id = 'bgLoadBanner';
     banner.style.cssText = 'position:fixed;bottom:16px;right:16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:12px;color:var(--text-muted);box-shadow:0 4px 16px rgba(0,0,0,.3);z-index:500;display:flex;align-items:center;gap:8px';
     banner.innerHTML = '<div class="spinner" style="width:14px;height:14px;border-width:2px"></div><span id="bgLoadText">Memuat semua data...</span>';
+    // Hapus banner lama jika ada
+    const oldBanner = document.getElementById('bgLoadBanner');
+    if (oldBanner) oldBanner.remove();
     document.body.appendChild(banner);
-    let from = LIMIT;
-    while (true) {
+
+    let from = allData.length; // mulai dari posisi terakhir, bukan hardcode LIMIT
+    let retryCount = 0;
+    while (retryCount < 20) { // max 20 batch = 20.000 data
       let q2 = sb.from('customers').select('*').order('created_at', {ascending: false}).range(from, from + LIMIT - 1);
       if (!isAdmin) q2 = q2.eq('cs_id', currentUser.id);
-      const { data: more } = await q2;
-      if (!more || more.length === 0) break;
+      const { data: more, error: err2 } = await q2;
+      if (err2 || !more || more.length === 0) break;
       allData = allData.concat(more);
-      from += LIMIT;
+      from += more.length; // pakai panjang actual, bukan asumsi LIMIT
       const t = document.getElementById('bgLoadText');
       if (t) t.textContent = `Memuat... ${allData.length} data`;
       customers = buildCustomers(allData);
       filtered = [...customers];
       updateStats();
-      if (more.length < LIMIT) break;
+      if (more.length < LIMIT) break; // batch terakhir, tidak ada lagi
+      retryCount++;
     }
-    // Hanya re-render jika masih di view database
     if (DB_VIEWS.has(activeView)) renderView();
     const b = document.getElementById('bgLoadBanner');
     if (b) { b.innerHTML = `✅ ${allData.length} data dimuat`; setTimeout(()=>b.remove(),2000); }
@@ -1475,17 +1482,19 @@ async function refreshProgresOrderan() {
   if (!isAdmin) q = q.eq('cs_id', currentUser.id);
   const { data: first } = await q;
   let allData = first || [];
-  // Load sisa jika ada
-  if (allData.length === LIMIT) {
-    let from = LIMIT;
-    while (true) {
+  // Load sisa jika ada — gunakan >= bukan ===
+  if (allData.length >= LIMIT) {
+    let from = allData.length;
+    let retryCount = 0;
+    while (retryCount < 20) {
       let q2 = sb.from('customers').select('*').order('created_at', {ascending: false}).range(from, from + LIMIT - 1);
       if (!isAdmin) q2 = q2.eq('cs_id', currentUser.id);
       const { data: more } = await q2;
       if (!more || more.length === 0) break;
       allData = allData.concat(more);
-      from += LIMIT;
+      from += more.length;
       if (more.length < LIMIT) break;
+      retryCount++;
     }
   }
   customers = buildCustomers(allData);
@@ -1747,13 +1756,14 @@ async function doUpdateProgres() {
 
   // 1. Load SEMUA customer dari DB
   progText.textContent = 'Memuat data customer dari database...';
-  let allCustomers = [], from = 0;
-  while (true) {
+  let allCustomers = [], from = 0, retryCount = 0;
+  while (retryCount < 20) {
     const { data, error } = await sbAdmin.from('customers').select('id,resi,no_hp,nama,status_paket').range(from, from + 999);
     if (error || !data || !data.length) break;
     allCustomers = allCustomers.concat(data);
+    from += data.length; // pakai panjang actual
     if (data.length < 1000) break;
-    from += 1000;
+    retryCount++;
   }
   progSub.textContent = `${allCustomers.length} customer dimuat dari database`;
 
@@ -2164,15 +2174,16 @@ async function viewCSData(csId, csName) {
   document.getElementById('addBtn').style.display = ''; document.getElementById('searchBoxWrap').style.display = ''; document.getElementById('exportBtn').style.display = '';
   activeView = 'db';
   document.getElementById('mainContent').innerHTML = '<div class="empty"><div class="spinner"></div><div class="loading-sub" style="margin-top:12px" id="loadingText">Memuat data...</div></div>';
-  let allData = [], from = 0;
-  while (true) {
+  let allData = [], from = 0, retryCount = 0;
+  while (retryCount < 20) {
     const loadTxt = document.getElementById('loadingText');
     if (loadTxt) loadTxt.textContent = `Memuat data... ${allData.length} baris`;
     const { data, error } = await sbAdmin.from('customers').select('*').eq('cs_id', csId).order('created_at', { ascending: false }).range(from, from + 999);
     if (error || !data || data.length === 0) break;
     allData = allData.concat(data);
+    from += data.length; // pakai panjang actual
     if (data.length < 1000) break;
-    from += 1000;
+    retryCount++;
   }
   customers = allData.map((d, i) => { const roCount = [1,2,3,4,5,6,7,8,9,10].filter(n => d['ro'+n]).length; return { ...d, _ci: i % COLORS.length, _beli: 1 + roCount, _loyal: roCount >= 10 }; });
   filtered = [...customers]; page = 1; renderCustomerView();

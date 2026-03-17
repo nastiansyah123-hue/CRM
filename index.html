@@ -781,37 +781,42 @@ async function loadCustomers() {
   // Gunakan fetch langsung dengan header Range untuk bypass Supabase max_rows limit
   // sbAdmin.from() terkena setting max_rows di Supabase Dashboard (default 1000)
   // Fetch langsung dengan header "Range" bisa melewati batasan ini
-  async function fetchBatch(from) {
+  // Gunakan cursor-based pagination pakai created_at
+  // Lebih andal dari offset karena tidak bergantung pada max_rows setting
+  async function fetchBatch(lastCreatedAt) {
     const csFilter = !isAdmin ? `&cs_id=eq.${currentUser.id}` : '';
-    const url = `${SUPABASE_URL}/rest/v1/customers?select=*&order=created_at.desc${csFilter}&offset=${from}&limit=${LIMIT}`;
+    const cursorFilter = lastCreatedAt ? `&created_at=lt.${encodeURIComponent(lastCreatedAt)}` : '';
+    const url = `${SUPABASE_URL}/rest/v1/customers?select=*&order=created_at.desc${csFilter}${cursorFilter}&limit=${LIMIT}`;
     const res = await fetch(url, {
       headers: {
         'apikey': SUPABASE_SERVICE_KEY,
         'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-        'Range-Unit': 'items',
-        'Range': `${from}-${from + LIMIT - 1}`,
         'Prefer': 'count=none'
       }
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.error('fetchBatch error:', res.status, await res.text());
+      return [];
+    }
     return await res.json();
   }
 
   let allData = [];
-  let from = 0;
+  let lastCreatedAt = null;
   let batchNum = 0;
   const oldBanner = document.getElementById('bgLoadBanner');
   if (oldBanner) oldBanner.remove();
 
-  while (batchNum < 50) { // max 50.000 data
+  while (batchNum < 50) {
     const loadTxt = document.getElementById('loadingText');
     if (loadTxt && batchNum > 0) loadTxt.textContent = `Memuat... ${allData.length} data`;
 
-    const batch = await fetchBatch(from);
+    const batch = await fetchBatch(lastCreatedAt);
     if (!batch || batch.length === 0) break;
 
     allData = allData.concat(batch);
-    from += batch.length;
+    // Cursor = created_at data terakhir di batch ini
+    lastCreatedAt = batch[batch.length - 1].created_at;
 
     if (batchNum === 0) {
       customers = buildCustomers(allData);
@@ -1504,15 +1509,14 @@ async function refreshProgresOrderan() {
     return { ...d, _ci: i % COLORS.length, _beli: 1 + roCount, _loyal: roCount >= 10 };
   });
 
-  async function fetchBatchRefresh(from) {
+  async function fetchBatchRefresh(lastCreatedAt) {
     const csFilter = !isAdmin ? `&cs_id=eq.${currentUser.id}` : '';
-    const url = `${SUPABASE_URL}/rest/v1/customers?select=*&order=created_at.desc${csFilter}&offset=${from}&limit=${LIMIT}`;
+    const cursorFilter = lastCreatedAt ? `&created_at=lt.${encodeURIComponent(lastCreatedAt)}` : '';
+    const url = `${SUPABASE_URL}/rest/v1/customers?select=*&order=created_at.desc${csFilter}${cursorFilter}&limit=${LIMIT}`;
     const res = await fetch(url, {
       headers: {
         'apikey': SUPABASE_SERVICE_KEY,
         'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-        'Range-Unit': 'items',
-        'Range': `${from}-${from + LIMIT - 1}`,
         'Prefer': 'count=none'
       }
     });
@@ -1520,12 +1524,12 @@ async function refreshProgresOrderan() {
     return await res.json();
   }
 
-  let allData = [], from = 0, batchNum = 0;
+  let allData = [], lastCreatedAt = null, batchNum = 0;
   while (batchNum < 50) {
-    const batch = await fetchBatchRefresh(from);
+    const batch = await fetchBatchRefresh(lastCreatedAt);
     if (!batch || batch.length === 0) break;
     allData = allData.concat(batch);
-    from += batch.length;
+    lastCreatedAt = batch[batch.length - 1].created_at;
     if (batch.length < LIMIT) break;
     batchNum++;
   }

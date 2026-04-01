@@ -1932,8 +1932,12 @@ async function renderAdminImport() {
           <div class="fg"><div class="fl">Nama Sheet</div><input class="fi" id="gsSheet" placeholder="NMA" value="NMA"></div>
           <div class="fg"><div class="fl">Mulai dari baris ke</div><input class="fi" id="gsStartRow" type="number" value="2" min="1"></div>
         </div>
-        <div class="fg"><div class="fl">Assign ke CS (jika kolom NAMA CS tidak ada)</div>
-          <select class="fs" id="gsAssignCs"><option value="">— Otomatis dari kolom NAMA CS —</option>${csOptions}</select>
+        <div class="fg">
+          <div class="fl" style="color:var(--accent3);font-weight:600">📌 Pilih CS Pemilik Data * (wajib)</div>
+          <select class="fs" id="gsAssignCs" style="border:2px solid rgba(245,158,11,.4)">
+            <option value="">— Pilih CS —</option>${csOptions}
+          </select>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Semua data akan masuk ke CS yang dipilih, kolom NAMA CS di file diabaikan</div>
         </div>
         <button class="btn btn-primary" id="gsSyncBtn" onclick="syncGoogleSheets()" style="margin-top:8px">🔄 Sync dari Google Sheets</button>
       </div>
@@ -1941,10 +1945,17 @@ async function renderAdminImport() {
     <div class="table-card" style="margin-bottom:16px">
       <div class="table-head"><span class="table-ttl">📁 Upload File Excel / CSV</span></div>
       <div style="padding:20px">
-        <div class="fg"><div class="fl">Pilih File (.xlsx atau .csv)</div><input type="file" class="fi" id="importFile" accept=".xlsx,.csv" onchange="previewImportFile(this)"></div>
-        <div class="fg"><div class="fl">Assign ke CS (jika kolom NAMA CS tidak ada)</div>
-          <select class="fs" id="fileAssignCs"><option value="">— Otomatis dari kolom NAMA CS —</option>${csOptions}</select>
+        <div class="fg">
+          <div class="fl" style="color:var(--accent3);font-weight:600">📌 Pilih CS Pemilik Data * (wajib)</div>
+          <select class="fs" id="fileAssignCs" style="border:2px solid rgba(245,158,11,.4)" onchange="document.getElementById('importFile').disabled=!this.value">
+            <option value="">— Pilih CS dulu sebelum upload file —</option>${csOptions}
+          </select>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Semua data akan masuk ke CS yang dipilih, kolom NAMA CS di file diabaikan</div>
         </div>
+        <div class="fg"><div class="fl">Pilih File (.xlsx atau .csv)</div>
+          <input type="file" class="fi" id="importFile" accept=".xlsx,.csv" disabled onchange="previewImportFile(this)" style="opacity:0.5">
+        </div>
+        <div style="font-size:12px;color:var(--accent3);margin-top:-8px" id="fileHint">⬆️ Pilih CS dulu, baru upload file</div>
       </div>
     </div>
     <div id="importPreview" style="display:none">
@@ -1971,6 +1982,8 @@ async function syncGoogleSheets() {
   const url = document.getElementById('gsUrl').value.trim();
   const sheet = document.getElementById('gsSheet').value.trim() || 'NMA';
   const startRow = parseInt(document.getElementById('gsStartRow').value) || 2;
+  const assignCs = document.getElementById('gsAssignCs').value;
+  if (!assignCs) { toast('⚠️', 'Pilih CS dulu sebelum sync!'); return; }
   if (!url) { toast('⚠️','Masukkan link Google Sheets!'); return; }
   const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
   if (!match) { toast('❌','Link tidak valid!'); return; }
@@ -1995,6 +2008,9 @@ async function syncGoogleSheets() {
 async function previewImportFile(input) {
   const file = input.files[0]; if (!file) return;
   const assignCs = document.getElementById('fileAssignCs').value;
+  if (!assignCs) { toast('⚠️', 'Pilih CS dulu sebelum upload file!'); input.value = ''; return; }
+  const hint = document.getElementById('fileHint');
+  if (hint) hint.style.display = 'none';
   try {
     let rows;
     if (file.name.endsWith('.csv')) rows = parseCSV(await file.text());
@@ -2095,45 +2111,23 @@ function showImportPreview(data, title) {
 
 async function doImport() {
   if (!importData.length) { toast('⚠️','Tidak ada data'); return; }
+
+  // Ambil CS dari dropdown — wajib dipilih
+  const assignCs = document.getElementById('fileAssignCs')?.value || document.getElementById('gsAssignCs')?.value || '';
+  if (!assignCs) { toast('⚠️', 'Pilih CS dulu sebelum import!'); return; }
+
   document.getElementById('importPreview').style.display = 'none';
   document.getElementById('importProgress').style.display = '';
   const progText = document.getElementById('importProgressText');
   const progSub = document.getElementById('importProgressSub');
-  const { data: profiles } = await sbAdmin.from('profiles').select('id,full_name,cs_code').eq('role','cs');
-  const csMap = {};
-  const csProfiles = profiles || [];
-  csProfiles.forEach(p => {
-    const name = p.full_name || '';
-    const nameLow = name.toLowerCase();
-    const nameStripped = nameLow.replace(/^(cs|crm|spv)\s*/i,'').trim();
-    csMap[nameLow] = p.id; csMap[nameLow.replace(/\s+/g,'')] = p.id;
-    csMap[nameStripped] = p.id; csMap['cs ' + nameStripped] = p.id; csMap['crm ' + nameStripped] = p.id;
-    if (p.cs_code) { csMap[p.cs_code.toLowerCase()] = p.id; csMap[p.cs_code.toLowerCase().replace(/[_\s]/g,'')] = p.id; }
-  });
-  function findCS(nameFromExcel) {
-    if (!nameFromExcel) return null;
-    const q = nameFromExcel.toLowerCase().trim();
-    if (csMap[q]) return csMap[q];
-    if (csMap[q.replace(/\s+/g,'')]) return csMap[q.replace(/\s+/g,'')];
-    const stripped = q.replace(/^(cs|crm|spv)\s*/i,'').trim();
-    if (csMap[stripped]) return csMap[stripped];
-    for (const p of csProfiles) {
-      const pStripped = (p.full_name||'').toLowerCase().replace(/^(cs|crm|spv)\s*/i,'').trim();
-      if (pStripped === stripped || pStripped.includes(stripped) || stripped.includes(pStripped)) return p.id;
-    }
-    return null;
-  }
-  let success = 0, failed = 0, unmatched = 0;
+
+  let success = 0, failed = 0;
   const BATCH = 1000;
-  const isCS = currentProfile?.role === 'cs';
+
+  // Semua data masuk ke CS yang dipilih di dropdown — kolom NAMA CS di file diabaikan
   const allRows = importData.map(d => {
-    // Kalau yang import adalah CS (bukan admin/spv), selalu pakai cs_id sendiri
-    // Abaikan kolom NAMA CS di file — data selalu milik yang upload
-    let cs_id = isCS ? currentUser.id : (d._force_cs || null);
-    if (!cs_id && d._cs_name) cs_id = findCS(d._cs_name);
-    if (!cs_id) { unmatched++; cs_id = currentUser.id; }
     const { _cs_name, _force_cs, ...clean } = d;
-    return { ...clean, cs_id };
+    return { ...clean, cs_id: assignCs };
   });
   const batches = [];
   for (let i = 0; i < allRows.length; i += BATCH) batches.push(allRows.slice(i, i + BATCH));
@@ -2150,7 +2144,7 @@ async function doImport() {
     <div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:12px;padding:24px;text-align:center">
       <div style="font-size:36px;margin-bottom:12px">✅</div>
       <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:18px;margin-bottom:6px">Import Selesai!</div>
-      <div style="font-size:14px;color:var(--text-muted)">${success} data berhasil • ${failed} gagal ${unmatched>0?'• ⚠️ '+unmatched+' nama CS tidak cocok':''}</div>
+      <div style="font-size:14px;color:var(--text-muted)">${success} data berhasil • ${failed} gagal</div>
       <button class="btn btn-primary" style="margin-top:16px" onclick="switchView('db',null)">Lihat Database →</button>
     </div>`;
   importData = [];

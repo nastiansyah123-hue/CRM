@@ -2127,8 +2127,11 @@ async function doImport() {
   }
   let success = 0, failed = 0, unmatched = 0;
   const BATCH = 1000;
+  const isCS = currentProfile?.role === 'cs';
   const allRows = importData.map(d => {
-    let cs_id = d._force_cs || null;
+    // Kalau yang import adalah CS (bukan admin/spv), selalu pakai cs_id sendiri
+    // Abaikan kolom NAMA CS di file — data selalu milik yang upload
+    let cs_id = isCS ? currentUser.id : (d._force_cs || null);
     if (!cs_id && d._cs_name) cs_id = findCS(d._cs_name);
     if (!cs_id) { unmatched++; cs_id = currentUser.id; }
     const { _cs_name, _force_cs, ...clean } = d;
